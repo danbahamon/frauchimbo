@@ -1,0 +1,427 @@
+import type { Answer, Blueprint, Locale, Localized } from './types'
+import { fractionValue } from './math'
+
+const STR: Record<string, Localized> = {
+  'app.tagline': {
+    en: 'A studio for mathematical practice',
+    de: 'Ein Atelier für mathematisches Üben',
+    es: 'Un estudio para practicar matemáticas',
+  },
+  'nav.home': { en: 'Home', de: 'Start', es: 'Inicio' },
+  'nav.practice': { en: 'Practice', de: 'Üben', es: 'Practicar' },
+  'nav.test': { en: 'Test', de: 'Test', es: 'Prueba' },
+  'nav.stats': { en: 'Stats', de: 'Statistik', es: 'Datos' },
+  'nav.settings': { en: 'Settings', de: 'Einstellungen', es: 'Ajustes' },
+  'home.practice': { en: 'Practice a skill', de: 'Eine Fertigkeit üben', es: 'Practicar una destreza' },
+  'home.practice.sub': {
+    en: 'One idea, many forms, instant steps',
+    de: 'Eine Idee, viele Formen, sofortige Schritte',
+    es: 'Una idea, muchas formas, pasos al instante',
+  },
+  'home.test': { en: 'Take a test', de: 'Einen Test machen', es: 'Hacer una prueba' },
+  'home.test.sub': {
+    en: 'Build it, print it, or follow the month',
+    de: 'Bauen, drucken oder dem Monat folgen',
+    es: 'Créala, imprímela o sigue el mes',
+  },
+  'home.stats': { en: 'View stats', de: 'Statistik ansehen', es: 'Ver estadísticas' },
+  'home.stats.sub': {
+    en: 'Strengths, time, and where to grow',
+    de: 'Stärken, Zeit und wo du wachsen kannst',
+    es: 'Fortalezas, tiempo y dónde crecer',
+  },
+  'home.suggest': { en: 'Suggested for you', de: 'Für dich vorgeschlagen', es: 'Sugerido para ti' },
+  'home.streak': { en: '{n}-day spiral', de: 'Spirale über {n} Tage', es: 'Espiral de {n} días' },
+  'home.streak.one': { en: '1-day spiral', de: 'Spirale über 1 Tag', es: 'Espiral de 1 día' },
+  'home.streak.zero': { en: 'Start a spiral today', de: 'Heute eine Spirale beginnen', es: 'Empieza una espiral hoy' },
+  'home.resume': { en: 'Continue your test', de: 'Test fortsetzen', es: 'Continuar la prueba' },
+  'home.standards': { en: 'Grades 3–7 · Common Core studio', de: 'Klasse 3–7 · Common-Core-Atelier', es: 'Grados 3–7 · estudio Common Core' },
+  'greet.morning': { en: 'Good morning', de: 'Guten Morgen', es: 'Buenos días' },
+  'greet.afternoon': { en: 'Good afternoon', de: 'Guten Tag', es: 'Buenas tardes' },
+  'greet.evening': { en: 'Good evening', de: 'Guten Abend', es: 'Buenas tardes' },
+  'on.lang': { en: 'Which language should the studio speak?', de: 'Welche Sprache soll das Atelier sprechen?', es: '¿En qué idioma hablamos?' },
+  'on.name': { en: 'What should Frau Chimbo call you?', de: 'Wie soll Frau Chimbo dich nennen?', es: '¿Cómo debe llamarte Frau Chimbo?' },
+  'on.name.ph': { en: 'Your name', de: 'Dein Name', es: 'Tu nombre' },
+  'on.grade': { en: 'Where are you starting?', de: 'Wo steigst du ein?', es: '¿Por dónde empiezas?' },
+  'on.grade.sub': {
+    en: 'You can practice any grade later. This sets the first path.',
+    de: 'Später kannst du jede Klasse üben. Das setzt den ersten Weg.',
+    es: 'Luego puedes practicar cualquier grado. Esto marca el primer camino.',
+  },
+  'on.position': { en: 'How should the first problems feel?', de: 'Wie sollen die ersten Aufgaben sich anfühlen?', es: '¿Cómo deben sentirse los primeros problemas?' },
+  'pos.review': { en: 'Rebuilding', de: 'Wiederholen', es: 'Repasar' },
+  'pos.review.sub': { en: 'Shorter numbers, more room to remember', de: 'Kleinere Zahlen, mehr Raum zum Erinnern', es: 'Números más cortos, más espacio para recordar' },
+  'pos.onlevel': { en: 'On level', de: 'Passend', es: 'En mi nivel' },
+  'pos.onlevel.sub': { en: 'The usual work for this grade', de: 'Die übliche Arbeit für diese Klasse', es: 'El trabajo habitual de este grado' },
+  'pos.stretch': { en: 'Stretching', de: 'Weiter greifen', es: 'Ir más allá' },
+  'pos.stretch.sub': { en: 'Harder numbers from the first spiral', de: 'Schwierigere Zahlen ab der ersten Spirale', es: 'Números más difíciles desde la primera espiral' },
+  'on.next': { en: 'Continue', de: 'Weiter', es: 'Continuar' },
+  'on.start': { en: 'Enter the studio', de: 'Ins Atelier', es: 'Entrar al estudio' },
+  'on.back': { en: 'Back', de: 'Zurück', es: 'Atrás' },
+  'grade.n': { en: 'Grade {n}', de: 'Klasse {n}', es: 'Grado {n}' },
+  'diff.1': { en: 'Warm-up', de: 'Aufwärmen', es: 'Calentar' },
+  'diff.2': { en: 'Steady', de: 'Ruhig', es: 'Constante' },
+  'diff.3': { en: 'On level', de: 'Passend', es: 'En nivel' },
+  'diff.4': { en: 'Bold', de: 'Mutig', es: 'Audaz' },
+  'diff.5': { en: 'Spiral', de: 'Spirale', es: 'Espiral' },
+  'practice.search': { en: 'Search skills', de: 'Fertigkeiten suchen', es: 'Buscar destrezas' },
+  'practice.all': { en: 'All', de: 'Alle', es: 'Todas' },
+  'practice.pick': { en: 'Choose a strand', de: 'Wähle einen Bereich', es: 'Elige un área' },
+  'practice.count': { en: '{n} skills', de: '{n} Fertigkeiten', es: '{n} destrezas' },
+  'practice.backstrands': { en: 'All strands', de: 'Alle Bereiche', es: 'Todas las áreas' },
+  'practice.empty': { en: 'Nothing matches that search.', de: 'Nichts passt zu dieser Suche.', es: 'Nada coincide con esa búsqueda.' },
+  'practice.open': { en: 'Open', de: 'Öffnen', es: 'Abrir' },
+  'play.setup': { en: 'Set the spiral', de: 'Spirale einstellen', es: 'Ajustar la espiral' },
+  'play.begin': { en: 'Begin', de: 'Beginnen', es: 'Empezar' },
+  'play.check': { en: 'Check', de: 'Prüfen', es: 'Comprobar' },
+  'play.next': { en: 'Next problem', de: 'Nächste Aufgabe', es: 'Siguiente problema' },
+  'play.again': { en: 'Try another', de: 'Noch eine', es: 'Otra más' },
+  'play.steps': { en: 'Step by step', de: 'Schritt für Schritt', es: 'Paso a paso' },
+  'play.path': { en: 'See the path', de: 'Den Weg ansehen', es: 'Ver el camino' },
+  'play.hide': { en: 'Hide steps', de: 'Schritte verbergen', es: 'Ocultar pasos' },
+  'play.need': { en: 'Enter an answer first.', de: 'Zuerst eine Antwort eingeben.', es: 'Primero escribe una respuesta.' },
+  'play.session': { en: '{c} of {n} correct', de: '{c} von {n} richtig', es: '{c} de {n} correctas' },
+  'play.level': { en: 'Level', de: 'Stufe', es: 'Nivel' },
+  'play.done': { en: 'Finish session', de: 'Sitzung beenden', es: 'Terminar sesión' },
+  'play.answer': { en: 'The answer', de: 'Die Antwort', es: 'La respuesta' },
+  'play.levelup': {
+    en: 'Five clean answers. The next one can be harder.',
+    de: 'Fünf saubere Antworten. Die nächste darf schwieriger sein.',
+    es: 'Cinco respuestas limpias. La siguiente puede ser más difícil.',
+  },
+  'play.harder': { en: 'Go harder', de: 'Schwieriger', es: 'Más difícil' },
+  'play.stay': { en: 'Stay here', de: 'Hier bleiben', es: 'Quedarme aquí' },
+  'play.why': { en: 'Why this matters', de: 'Wozu das gut ist', es: 'Para qué sirve' },
+  'play.why.close': { en: 'Close', de: 'Schließen', es: 'Cerrar' },
+  'play.backlist': { en: 'Back to skills', de: 'Zurück zu den Fertigkeiten', es: 'Volver a las destrezas' },
+  'fb.exact': { en: 'Exactly.', de: 'Genau.', es: 'Exacto.' },
+  'fb.clean': { en: 'Clean work.', de: 'Sauber gelöst.', es: 'Trabajo limpio.' },
+  'fb.spiral': { en: 'The spiral agrees.', de: 'Die Spirale nickt.', es: 'La espiral está de acuerdo.' },
+  'fb.miss': { en: 'Not yet. The path is below.', de: 'Noch nicht. Der Weg steht unten.', es: 'Todavía no. El camino está abajo.' },
+  'fb.close': { en: 'The value matches, and it still needs simplest form.', de: 'Der Wert stimmt, die kürzeste Form fehlt noch.', es: 'El valor coincide, y aún falta la forma más simple.' },
+  'fb.streak': { en: 'Five in a row. A perfect spiral.', de: 'Fünf in Folge. Eine perfekte Spirale.', es: 'Cinco seguidas. Una espiral perfecta.' },
+  'test.choose': { en: 'How should the test begin?', de: 'Wie soll der Test beginnen?', es: '¿Cómo empieza la prueba?' },
+  'test.mode.month': { en: 'A month of the standard', de: 'Ein Monat des Standards', es: 'Un mes del estándar' },
+  'test.mode.month.sub': { en: 'One checkpoint, ready to start', de: 'Ein Abschnitt, startklar', es: 'Un tramo, listo para empezar' },
+  'test.mode.compose': { en: 'Choose the skills', de: 'Fertigkeiten wählen', es: 'Elegir las destrezas' },
+  'test.mode.compose.sub': { en: 'A short tray, then new numbers', de: 'Eine kurze Auswahl, dann neue Zahlen', es: 'Una bandeja corta, luego números nuevos' },
+  'test.thisMonth': { en: 'This point in the year', de: 'Diese Stelle im Jahr', es: 'Este punto del año' },
+  'test.hero': { en: 'Check against the standard', de: 'Mit dem Standard vergleichen', es: 'Comparar con el estándar' },
+  'test.hero.sub': {
+    en: 'A month of the Common Core, with fresh numbers every time.',
+    de: 'Ein Monat des Common Core, jedes Mal mit neuen Zahlen.',
+    es: 'Un mes del Common Core, con números nuevos cada vez.',
+  },
+  'test.startCheck': { en: 'Start this check', de: 'Diesen Check starten', es: 'Empezar esta prueba' },
+  'test.customize': { en: 'Customize first', de: 'Zuerst anpassen', es: 'Personalizar primero' },
+  'test.build': { en: 'Or compose your own', de: 'Oder selbst zusammenstellen', es: 'O compón la tuya' },
+  'test.add': { en: 'Add', de: 'Dazu', es: 'Añadir' },
+  'test.tray': { en: '{n} questions', de: '{n} Aufgaben', es: '{n} preguntas' },
+  'test.compose': { en: 'Compose', de: 'Zusammenstellen', es: 'Componer' },
+  'test.title': { en: 'Test title', de: 'Testtitel', es: 'Título de la prueba' },
+  'test.title.ph': { en: 'Optional name', de: 'Name, freiwillig', es: 'Nombre opcional' },
+  'test.count': { en: 'Questions', de: 'Aufgaben', es: 'Preguntas' },
+  'test.remove': { en: 'Remove', de: 'Entfernen', es: 'Quitar' },
+  'test.begin': { en: 'Start test', de: 'Test starten', es: 'Empezar prueba' },
+  'test.print': { en: 'Print blank', de: 'Leer drucken', es: 'Imprimir en blanco' },
+  'test.share': { en: 'Share', de: 'Teilen', es: 'Compartir' },
+  'test.back': { en: 'Back to skills', de: 'Zurück zu den Fertigkeiten', es: 'Volver a las destrezas' },
+  'test.empty': { en: 'Add at least one skill.', de: 'Nimm mindestens eine Fertigkeit dazu.', es: 'Añade al menos una destreza.' },
+  'test.map': { en: 'Whole test', de: 'Ganzer Test', es: 'Prueba completa' },
+  'test.focus': { en: 'One by one', de: 'Einzeln', es: 'Una por una' },
+  'test.finish': { en: 'Finish', de: 'Beenden', es: 'Terminar' },
+  'test.blank': { en: 'Blank', de: 'Leer', es: 'En blanco' },
+  'test.answered': { en: 'Answered', de: 'Beantwortet', es: 'Respondida' },
+  'test.confirm': {
+    en: '{n} questions are still blank. Finish anyway?',
+    de: '{n} Aufgaben sind noch leer. Trotzdem beenden?',
+    es: '{n} preguntas siguen en blanco. ¿Terminar igual?',
+  },
+  'test.stay': { en: 'Keep working', de: 'Weiterarbeiten', es: 'Seguir' },
+  'test.end': { en: 'Finish now', de: 'Jetzt beenden', es: 'Terminar ahora' },
+  'test.q': { en: 'Question {n}', de: 'Aufgabe {n}', es: 'Pregunta {n}' },
+  'test.time': { en: 'Time', de: 'Zeit', es: 'Tiempo' },
+  'choose.title': { en: 'The test is in.', de: 'Der Test ist abgegeben.', es: 'La prueba está entregada.' },
+  'choose.sub': {
+    en: 'You can read the score, or sit with Frau Chimbo and hunt the mistakes yourself.',
+    de: 'Du kannst die Punkte lesen oder mit Frau Chimbo selbst nach den Fehlern suchen.',
+    es: 'Puedes leer la puntuación, o sentarte con Frau Chimbo y buscar los errores.',
+  },
+  'choose.results': { en: 'See results', de: 'Ergebnis ansehen', es: 'Ver resultados' },
+  'choose.hunt': { en: 'Investigate together', de: 'Gemeinsam untersuchen', es: 'Investigar juntos' },
+  'inv.kicker': { en: 'Cooperative review', de: 'Gemeinsame Durchsicht', es: 'Revisión cooperativa' },
+  'inv.ask': { en: 'Which answer is incorrect?', de: 'Welche Antwort ist falsch?', es: '¿Cuál respuesta es incorrecta?' },
+  'inv.progress': { en: 'Mistake {n} of {m}', de: 'Fehler {n} von {m}', es: 'Error {n} de {m}' },
+  'inv.spot': { en: 'You spotted the mistake.', de: 'Du hast den Fehler erkannt.', es: 'Encontraste el error.' },
+  'inv.miss': { en: 'That one is actually correct. The other is the slip.', de: 'Die ist tatsächlich richtig. Die andere ist der Ausrutscher.', es: 'Esa en realidad es correcta. La otra es el desliz.' },
+  'inv.next': { en: 'Next comparison', de: 'Nächster Vergleich', es: 'Siguiente comparación' },
+  'inv.summary': { en: 'See the summary', de: 'Zur Zusammenfassung', es: 'Ver el resumen' },
+  'inv.none': { en: 'There are no mistakes to investigate.', de: 'Es gibt keine Fehler zu untersuchen.', es: 'No hay errores que investigar.' },
+  'inv.card': { en: 'Answer {n}', de: 'Antwort {n}', es: 'Respuesta {n}' },
+  'inv.blank': { en: 'Left blank', de: 'Leer gelassen', es: 'En blanco' },
+  'sum.score': { en: 'Score', de: 'Punkte', es: 'Puntuación' },
+  'sum.time': { en: 'Total time', de: 'Gesamtzeit', es: 'Tiempo total' },
+  'sum.avg': { en: 'Average per question', de: 'Schnitt pro Aufgabe', es: 'Promedio por pregunta' },
+  'sum.wrong': { en: 'Incorrect', de: 'Falsch', es: 'Incorrectas' },
+  'sum.strengths': { en: 'Strengths', de: 'Stärken', es: 'Fortalezas' },
+  'sum.growth': { en: 'Worth another look', de: 'Noch einmal ansehen', es: 'Vale otra mirada' },
+  'sum.harder': { en: 'Try this harder', de: 'Das schwieriger versuchen', es: 'Prueba esto más difícil' },
+  'sum.practice': { en: 'Practice this', de: 'Das üben', es: 'Practicar esto' },
+  'sum.print': { en: 'Print for a teacher', de: 'Für eine Lehrkraft drucken', es: 'Imprimir para un docente' },
+  'sum.again': { en: 'New numbers, same test', de: 'Neue Zahlen, gleicher Test', es: 'Números nuevos, misma prueba' },
+  'sum.home': { en: 'Home', de: 'Start', es: 'Inicio' },
+  'sum.eye': { en: 'You spotted {s} of {t} mistakes while reviewing.', de: 'Beim Prüfen hast du {s} von {t} Fehlern erkannt.', es: 'Al revisar encontraste {s} de {t} errores.' },
+  'sum.perfect': { en: 'Every answer held.', de: 'Jede Antwort hat gehalten.', es: 'Todas las respuestas se sostuvieron.' },
+  'sum.subjects': { en: 'By subject', de: 'Nach Thema', es: 'Por tema' },
+  'sum.slow': { en: 'Took the longest', de: 'Hat am längsten gedauert', es: 'Tardó más' },
+  'sum.dash': { en: 'A glance for a teacher', de: 'Ein Blick für die Lehrkraft', es: 'Una mirada para el docente' },
+  'sum.tap': { en: 'Open', de: 'Öffnen', es: 'Abrir' },
+  'sum.questions': { en: 'Questions', de: 'Aufgaben', es: 'Preguntas' },
+  'sum.your': { en: 'Yours', de: 'Deine', es: 'Tuya' },
+  'sum.correct': { en: 'Correct', de: 'Richtig', es: 'Correcta' },
+  'stats.print': { en: 'Print for a teacher', de: 'Für eine Lehrkraft drucken', es: 'Imprimir para un docente' },
+  'stats.report': { en: 'Studio report', de: 'Atelierbericht', es: 'Informe del estudio' },
+  'stats.accuracy': { en: 'Recent accuracy', de: 'Jüngste Trefferquote', es: 'Precisión reciente' },
+  'stats.attempts': { en: '{n} attempts', de: '{n} Versuche', es: '{n} intentos' },
+  'stats.empty': {
+    en: 'Your studio is quiet. A few problems will wake the charts.',
+    de: 'Dein Atelier ist noch still. Ein paar Aufgaben wecken die Diagramme.',
+    es: 'Tu estudio está en silencio. Unos problemas despertarán los gráficos.',
+  },
+  'stats.strengths': { en: 'Strengths', de: 'Stärken', es: 'Fortalezas' },
+  'stats.growth': { en: 'Growth opportunities', de: 'Übungsfelder', es: 'Oportunidades de crecimiento' },
+  'stats.next': { en: 'Suggested next', de: 'Als Nächstes', es: 'Siguiente sugerencia' },
+  'stats.tests': { en: 'Recent tests', de: 'Letzte Tests', es: 'Pruebas recientes' },
+  'stats.none': { en: 'None yet', de: 'Noch keine', es: 'Aún ninguna' },
+  'stats.strands': { en: 'By strand', de: 'Nach Bereich', es: 'Por área' },
+  'stats.open': { en: 'Open', de: 'Öffnen', es: 'Abrir' },
+  'set.back': { en: 'Back', de: 'Zurück', es: 'Volver' },
+  'set.title': { en: 'Studio settings', de: 'Atelier-Einstellungen', es: 'Ajustes del estudio' },
+  'life.OA': {
+    en: 'This is how you share, group, and finish a story that has a missing number.',
+    de: 'So teilt man, gruppiert man und schließt eine Geschichte mit einer fehlenden Zahl.',
+    es: 'Así se reparte, se agrupa y se cierra una historia a la que le falta un número.',
+  },
+  'life.NBT': {
+    en: 'This is how money, distances, and big counts keep their places.',
+    de: 'So behalten Geld, Strecken und große Mengen ihre Stellen.',
+    es: 'Así el dinero, las distancias y las cantidades grandes conservan su lugar.',
+  },
+  'life.NF': {
+    en: 'Recipes, measuring cups, and fair shares all live in fractions.',
+    de: 'Rezepte, Messbecher und gerechtes Teilen leben in Brüchen.',
+    es: 'Las recetas, las tazas medidoras y los repartos justos viven en las fracciones.',
+  },
+  'life.MD': {
+    en: 'Clocks, maps, and graphs tell you how long, how far, and how many.',
+    de: 'Uhren, Karten und Diagramme sagen, wie lang, wie weit und wie viel.',
+    es: 'Los relojes, los mapas y las gráficas dicen cuánto dura, cuánto hay y qué tan lejos.',
+  },
+  'life.G': {
+    en: 'Rooms, maps, and boxes are shapes you can measure and place.',
+    de: 'Räume, Karten und Kartons sind Formen, die man messen und setzen kann.',
+    es: 'Las habitaciones, los mapas y las cajas son formas que se miden y se ubican.',
+  },
+  'life.RP': {
+    en: 'Prices, batches of a recipe, and percent off are all ratios.',
+    de: 'Preise, Rezeptmengen und Prozente sind alles Verhältnisse.',
+    es: 'Los precios, las recetas a otra escala y los descuentos son razones.',
+  },
+  'life.NS': {
+    en: 'Temperatures below zero, debt, and height above or below a line use these numbers.',
+    de: 'Temperaturen unter null, Schulden und Höhen über oder unter einer Linie brauchen diese Zahlen.',
+    es: 'Las temperaturas bajo cero, las deudas y las alturas usan estos números.',
+  },
+  'life.EE': {
+    en: 'An unknown price or a rule that keeps going can be written as an expression.',
+    de: 'Ein unbekannter Preis oder eine Regel, die weiterläuft, lässt sich als Term schreiben.',
+    es: 'Un precio desconocido o una regla que sigue se puede escribir como una expresión.',
+  },
+  'life.SP': {
+    en: 'This helps you tell a typical result from a lucky one.',
+    de: 'So unterscheidest du ein typisches Ergebnis von einem glücklichen.',
+    es: 'Esto ayuda a distinguir un resultado típico de uno que solo fue suerte.',
+  },
+  'set.name': { en: 'Name', de: 'Name', es: 'Nombre' },
+  'set.grade': { en: 'Starting grade', de: 'Startklasse', es: 'Grado de inicio' },
+  'set.position': { en: 'Starting position', de: 'Startpunkt', es: 'Posición de inicio' },
+  'set.language': { en: 'Language', de: 'Sprache', es: 'Idioma' },
+  'set.sound': { en: 'Sound', de: 'Ton', es: 'Sonido' },
+  'set.motion': { en: 'Motion', de: 'Bewegung', es: 'Movimiento' },
+  'set.theme': { en: 'Theme', de: 'Erscheinung', es: 'Tema' },
+  'set.day': { en: 'Day paper', de: 'Tagespapier', es: 'Papel de día' },
+  'set.dusk': { en: 'Dusk ink', de: 'Abendtinte', es: 'Tinta de atardecer' },
+  'set.export': { en: 'Export data', de: 'Daten exportieren', es: 'Exportar datos' },
+  'set.import': { en: 'Import data', de: 'Daten importieren', es: 'Importar datos' },
+  'set.reset': { en: 'Clear practice history', de: 'Übungsverlauf löschen', es: 'Borrar historial' },
+  'set.reset.confirm': {
+    en: 'This erases attempts and tests on this device. Your name stays.',
+    de: 'Das löscht Versuche und Tests auf diesem Gerät. Dein Name bleibt.',
+    es: 'Esto borra intentos y pruebas en este dispositivo. Tu nombre se queda.',
+  },
+  'set.import.bad': { en: 'That file is not a Frau Chimbo backup.', de: 'Diese Datei ist kein Frau-Chimbo-Backup.', es: 'Ese archivo no es una copia de Frau Chimbo.' },
+  'set.import.ok': { en: 'Backup restored.', de: 'Sicherung wiederhergestellt.', es: 'Copia restaurada.' },
+  'set.local': {
+    en: 'Everything lives in this browser. Export a backup before you switch devices.',
+    de: 'Alles liegt in diesem Browser. Exportiere eine Sicherung, bevor du das Gerät wechselst.',
+    es: 'Todo vive en este navegador. Exporta una copia antes de cambiar de dispositivo.',
+  },
+  'share.title': { en: 'Share this test', de: 'Diesen Test teilen', es: 'Compartir esta prueba' },
+  'share.note': {
+    en: 'The link keeps your topics, levels, and settings. Each person receives new numbers.',
+    de: 'Der Link behält Themen, Stufen und Einstellungen. Jede Person bekommt neue Zahlen.',
+    es: 'El enlace guarda temas, niveles y ajustes. Cada persona recibe números nuevos.',
+  },
+  'share.copy': { en: 'Copy link', de: 'Link kopieren', es: 'Copiar enlace' },
+  'share.copied': { en: 'Copied', de: 'Kopiert', es: 'Copiado' },
+  'share.native': { en: 'Share…', de: 'Teilen…', es: 'Compartir…' },
+  'share.close': { en: 'Close', de: 'Schließen', es: 'Cerrar' },
+  'shared.title': { en: 'A test was handed to you', de: 'Dir wurde ein Test gereicht', es: 'Te pasaron una prueba' },
+  'shared.start': { en: 'Take it with new numbers', de: 'Mit neuen Zahlen starten', es: 'Empezar con números nuevos' },
+  'shared.later': { en: 'Not now', de: 'Nicht jetzt', es: 'Ahora no' },
+  'shared.bad': { en: 'This link is damaged.', de: 'Dieser Link ist beschädigt.', es: 'Este enlace está dañado.' },
+  'print.name': { en: 'Name', de: 'Name', es: 'Nombre' },
+  'print.date': { en: 'Date', de: 'Datum', es: 'Fecha' },
+  'print.teacher': { en: 'Teacher report', de: 'Bericht für die Lehrkraft', es: 'Informe para el docente' },
+  'print.blank': { en: 'Practice test', de: 'Übungstest', es: 'Prueba de práctica' },
+  'print.answer': { en: 'Answer', de: 'Antwort', es: 'Respuesta' },
+  'print.student': { en: 'Student answer', de: 'Antwort der Schülerin oder des Schülers', es: 'Respuesta del estudiante' },
+  'print.key': { en: 'Correct answer', de: 'Richtige Antwort', es: 'Respuesta correcta' },
+  'yes': { en: 'Yes', de: 'Ja', es: 'Sí' },
+  'no': { en: 'No', de: 'Nein', es: 'No' },
+  'on': { en: 'On', de: 'An', es: 'Sí' },
+  'off': { en: 'Off', de: 'Aus', es: 'No' },
+  'cancel': { en: 'Cancel', de: 'Abbrechen', es: 'Cancelar' },
+  'save': { en: 'Save', de: 'Sichern', es: 'Guardar' },
+  'domain.OA': { en: 'Operations & thinking', de: 'Rechnen & Denken', es: 'Operaciones y pensamiento' },
+  'domain.NBT': { en: 'Place value', de: 'Stellenwerte', es: 'Valor posicional' },
+  'domain.NF': { en: 'Fractions', de: 'Brüche', es: 'Fracciones' },
+  'domain.MD': { en: 'Measure & data', de: 'Messen & Daten', es: 'Medición y datos' },
+  'domain.G': { en: 'Geometry', de: 'Geometrie', es: 'Geometría' },
+  'domain.RP': { en: 'Ratios', de: 'Verhältnisse', es: 'Razones' },
+  'domain.NS': { en: 'Number system', de: 'Zahlensystem', es: 'Sistema numérico' },
+  'domain.EE': { en: 'Expressions', de: 'Terme & Gleichungen', es: 'Expresiones' },
+  'domain.SP': { en: 'Stats & chance', de: 'Statistik & Zufall', es: 'Estadística y azar' },
+  'month.1': { en: 'January', de: 'Januar', es: 'enero' },
+  'month.2': { en: 'February', de: 'Februar', es: 'febrero' },
+  'month.3': { en: 'March', de: 'März', es: 'marzo' },
+  'month.4': { en: 'April', de: 'April', es: 'abril' },
+  'month.5': { en: 'May', de: 'Mai', es: 'mayo' },
+  'month.6': { en: 'June', de: 'Juni', es: 'junio' },
+  'month.7': { en: 'July', de: 'Juli', es: 'julio' },
+  'month.8': { en: 'August', de: 'August', es: 'agosto' },
+  'month.9': { en: 'September', de: 'September', es: 'septiembre' },
+  'month.10': { en: 'October', de: 'Oktober', es: 'octubre' },
+  'month.11': { en: 'November', de: 'November', es: 'noviembre' },
+  'month.12': { en: 'December', de: 'Dezember', es: 'diciembre' },
+  'month.s1': { en: 'Jan', de: 'Jan', es: 'ene' },
+  'month.s2': { en: 'Feb', de: 'Feb', es: 'feb' },
+  'month.s3': { en: 'Mar', de: 'Mär', es: 'mar' },
+  'month.s4': { en: 'Apr', de: 'Apr', es: 'abr' },
+  'month.s5': { en: 'May', de: 'Mai', es: 'may' },
+  'month.s6': { en: 'Jun', de: 'Jun', es: 'jun' },
+  'month.s9': { en: 'Sep', de: 'Sep', es: 'sep' },
+  'month.s11': { en: 'Nov', de: 'Nov', es: 'nov' },
+  'widget.editing': { en: 'Editing the {part}', de: 'Du bearbeitest den {part}', es: 'Estás editando el {part}' },
+  'widget.num': { en: 'Numerator', de: 'Zähler', es: 'Numerador' },
+  'widget.den': { en: 'Denominator', de: 'Nenner', es: 'Denominador' },
+  'widget.whole': { en: 'Whole', de: 'Ganze', es: 'Entero' },
+  'widget.hours': { en: 'Hours', de: 'Stunden', es: 'Horas' },
+  'widget.minutes': { en: 'Minutes', de: 'Minuten', es: 'Minutos' },
+  'widget.axis': { en: 'Axis max', de: 'Achsenende', es: 'Máximo del eje' },
+  'widget.size': { en: 'Size', de: 'Größe', es: 'Tamaño' },
+  'widget.color': { en: 'Color', de: 'Farbe', es: 'Color' },
+  'widget.style': { en: 'Chart', de: 'Diagramm', es: 'Gráfica' },
+  'widget.bars': { en: 'Bars', de: 'Säulen', es: 'Barras' },
+  'widget.line': { en: 'Line', de: 'Linie', es: 'Línea' },
+  'widget.clear': { en: 'Clear', de: 'Löschen', es: 'Borrar' },
+  'widget.shaded': { en: '{n} shaded', de: '{n} gefärbt', es: '{n} sombreadas' },
+  'size.s': { en: 'Compact', de: 'Klein', es: 'Compacto' },
+  'size.m': { en: 'Regular', de: 'Mittel', es: 'Regular' },
+  'size.l': { en: 'Poster', de: 'Groß', es: 'Póster' },
+  'lang.en': { en: 'English', de: 'English', es: 'English' },
+  'lang.de': { en: 'Deutsch', de: 'Deutsch', es: 'Deutsch' },
+  'lang.es': { en: 'Español', de: 'Español', es: 'Español' },
+  'reason.season': {
+    en: 'In season for this month',
+    de: 'In diesem Monat an der Reihe',
+    es: 'Toca este mes',
+  },
+  'reason.grow': {
+    en: 'Recent work is still unsteady',
+    de: 'Die letzte Arbeit wackelt noch',
+    es: 'El trabajo reciente aún tiembla',
+  },
+  'reason.harder': {
+    en: 'Strong enough to turn the difficulty up',
+    de: 'Sicher genug, um die Stufe anzuheben',
+    es: 'Bastante firme para subir la dificultad',
+  },
+  'reason.prereq': {
+    en: 'A foundation under a skill that is slipping',
+    de: 'Ein Fundament unter einer Fertigkeit, die rutscht',
+    es: 'Una base bajo una destreza que se resbala',
+  },
+  'unit.cm': { en: 'cm', de: 'cm', es: 'cm' },
+  'unit.m': { en: 'm', de: 'm', es: 'm' },
+  'unit.blocks': { en: 'blocks', de: 'Blöcke', es: 'bloques' },
+}
+
+export function t(locale: Locale, key: string, vars?: Record<string, string | number>) {
+  const row = STR[key]
+  let text = row?.[locale] ?? row?.en ?? key
+  if (vars) {
+    for (const [name, value] of Object.entries(vars)) {
+      text = text.replaceAll(`{${name}}`, String(value))
+    }
+  }
+  return text
+}
+
+export function tx(locale: Locale, value?: Localized) {
+  if (!value) return ''
+  return value[locale] || value.en
+}
+
+export function monthName(locale: Locale, month: number, short = false) {
+  return t(locale, `${short ? 'month.s' : 'month.'}${month}`)
+}
+
+export function answerIsBlank(answer: Answer | null) {
+  return answer == null
+}
+
+export function decimalKey(locale: Locale) {
+  return locale === 'en' ? '.' : ','
+}
+
+export function encodeShare(blueprint: Blueprint) {
+  const json = JSON.stringify(blueprint)
+  const bytes = new TextEncoder().encode(json)
+  let bin = ''
+  bytes.forEach((byte) => {
+    bin += String.fromCharCode(byte)
+  })
+  return btoa(bin).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/g, '')
+}
+
+export function decodeShare(code: string): Blueprint | null {
+  try {
+    const pad = code.length % 4 === 0 ? '' : '='.repeat(4 - (code.length % 4))
+    const b64 = code.replaceAll('-', '+').replaceAll('_', '/') + pad
+    const bin = atob(b64)
+    const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0))
+    const json = new TextDecoder().decode(bytes)
+    const data = JSON.parse(json) as Blueprint
+    if (!data || data.v !== 1 || !Array.isArray(data.items) || data.items.length === 0 || data.items.length > 24) {
+      return null
+    }
+    return data
+  } catch {
+    return null
+  }
+}
+
+export function fractionValueSafe(whole: number, n: number, d: number) {
+  return fractionValue(whole, n, d)
+}
