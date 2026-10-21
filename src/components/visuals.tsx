@@ -2,6 +2,7 @@ import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { Locale, Question, ShapeKind, Stimulus } from '../lib/types'
 import { tx } from '../lib/i18n'
 import { Expr, MathText, Tx } from './MathText'
+import { ShadeBar } from './ShadeBar'
 
 export function ShapeFig({ shape, parts, shaded, uneven }: { shape: ShapeKind; parts?: number; shaded?: number; uneven?: boolean }) {
   const cuts = parts ?? 0
@@ -92,13 +93,10 @@ export function StimulusView({ stimulus, locale }: { stimulus?: Stimulus; locale
   if (stimulus.type === 'clock') return <div className="figure" style={{ textAlign: 'center' }}><ClockFace h={stimulus.h} m={stimulus.m} /></div>
   if (stimulus.type === 'chart') return <div className="figure"><ChartFig {...stimulus} locale={locale} /></div>
   if (stimulus.type === 'grid') {
+    const on = Array.from({ length: stimulus.rows * stimulus.cols }, (_, index) => index < stimulus.shaded)
     return (
       <div className="figure">
-        <div className="grid-shade" style={{ gridTemplateColumns: `repeat(${stimulus.cols}, 1fr)` }}>
-          {Array.from({ length: stimulus.rows * stimulus.cols }, (_, index) => (
-            <div key={index} className={index < stimulus.shaded ? 'cell on' : 'cell'} />
-          ))}
-        </div>
+        <ShadeBar rows={stimulus.rows} cols={stimulus.cols} on={on} locale={locale} />
       </div>
     )
   }
@@ -352,12 +350,9 @@ export function AnswerFace({ question, answer, locale, blank }: { question: Ques
   }
   if (answer.kind === 'points') return <div className="entry">{answer.points.map((point) => `(${point.x}, ${point.y})`).join(' ')}</div>
   if (answer.kind === 'shade' && question.response.type === 'shade') {
-    const total = question.response.rows * question.response.cols
-    return (
-      <div className="grid-shade" style={{ gridTemplateColumns: `repeat(${question.response.cols}, 1fr)` }}>
-        {Array.from({ length: total }, (_, index) => <div key={index} className={index < answer.count ? 'cell on' : 'cell'} />)}
-      </div>
-    )
+    const { rows, cols } = question.response
+    const on = Array.from({ length: rows * cols }, (_, index) => index < answer.count)
+    return <ShadeBar rows={rows} cols={cols} on={on} locale={locale} />
   }
   if (answer.kind === 'clock') return <ClockFace h={answer.h} m={answer.m} />
   if (answer.kind === 'chart') {

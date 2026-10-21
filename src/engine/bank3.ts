@@ -6,6 +6,7 @@ import {
   expression,
   familyOf,
   frac,
+  knobBool,
   knobFlag,
   knobNum,
   L,
@@ -19,7 +20,7 @@ import {
 } from './shared'
 
 function timePair(ctx: Ctx) {
-  const five = ctx.difficulty < 3
+  const five = knobBool(ctx, 'fives', ctx.difficulty < 3)
   const h = ctx.rng.int(1, 12)
   const m = five ? ctx.rng.int(0, 11) * 5 : ctx.rng.int(0, 59)
   return { h, m }
@@ -36,8 +37,10 @@ function addWithin(ctx: Ctx, digits: number, cap?: number) {
   let a = ctx.rng.int(lo, hi)
   let b = ctx.rng.int(lo, hi)
   if (cap) {
-    a = ctx.rng.int(120, Math.min(700, cap - 80))
-    b = ctx.rng.int(40, cap - a)
+    // Both addends stay small enough that their sum is at or under the cap. A cap of 1,000 gives the classic 120 to 700 range.
+    const low = Math.min(120, Math.floor(cap / 5))
+    a = ctx.rng.int(low, Math.max(low, Math.min(700, cap - 80)))
+    b = ctx.rng.int(Math.min(40, Math.floor(cap / 4)), Math.max(10, cap - a))
   }
   return { a, b, sum: a + b }
 }
@@ -87,8 +90,9 @@ export function g3oaA(ctx: Ctx) {
 }
 
 export function g3oaB(ctx: Ctx) {
-  const a = ctx.rng.int(3, 9)
-  const b = ctx.rng.int(3, 9)
+  const top = knobNum(ctx, 'max', 9)
+  const a = ctx.rng.int(3, top)
+  const b = ctx.rng.int(3, top)
   if (ctx.mode === 'comm') {
     const pack = textChoice(
       L(`${n(a).en} × ${n(b).en} = ${n(b).en} × ${n(a).en}`, `${n(a).de} × ${n(b).de} = ${n(b).de} × ${n(a).de}`, `${n(a).es} × ${n(b).es} = ${n(b).es} × ${n(a).es}`),
@@ -171,7 +175,7 @@ export function g3oaC(ctx: Ctx) {
 export function g3oaD(ctx: Ctx) {
   if (ctx.mode === 'pattern') {
     const start = ctx.rng.int(2, 12)
-    const step = ctx.rng.int(2, 8)
+    const step = ctx.rng.int(2, Math.max(2, knobNum(ctx, 'max', 9) - 1))
     const seq = [0, 1, 2, 3].map((i) => start + i * step)
     const next = start + 4 * step
     return ask(
@@ -189,8 +193,8 @@ export function g3oaD(ctx: Ctx) {
       ],
     )
   }
-  const bags = ctx.rng.int(3, 8)
-  const each = ctx.rng.int(3, 9)
+  const bags = ctx.rng.int(3, Math.max(3, knobNum(ctx, 'max', 9) - 1))
+  const each = ctx.rng.int(3, knobNum(ctx, 'max', 9))
   const give = ctx.rng.int(2, bags * each - 2)
   const left = bags * each - give
   return ask(
@@ -212,8 +216,10 @@ export function g3oaD(ctx: Ctx) {
 
 export function g3nbt(ctx: Ctx) {
   if (ctx.mode === 'round') {
-    const place = ctx.rng.pick([10, 100])
-    let value = ctx.rng.int(120, 980)
+    const cap = knobNum(ctx, 'within', 1000)
+    // Hundreds need room, so below 300 the rounding is to the nearest ten.
+    const place = cap >= 300 ? ctx.rng.pick([10, 100]) : 10
+    let value = ctx.rng.int(Math.min(120, Math.floor(cap / 8)), cap - 20)
     const digit = Math.floor(value / (place / 10)) % 10
     if (digit === 5) value += 1
     const rounded = roundHalfUp(value, place)
@@ -250,10 +256,12 @@ export function g3nbt(ctx: Ctx) {
       expression([{ t: 'v', value: a }, { t: 'op', v: '×' }, { t: 'v', value: tens }]),
     )
   }
-  const pack = addWithin(ctx, 3, 1000)
+  const cap = knobNum(ctx, 'within', 1000)
+  const pack = addWithin(ctx, 3, cap)
   if (ctx.mode === 'sub') {
-    const a = ctx.rng.int(400, 980)
-    const b = ctx.rng.int(120, a - 15)
+    const top = Math.min(400, Math.floor(cap * 0.4))
+    const a = ctx.rng.int(top, cap - 20)
+    const b = ctx.rng.int(Math.min(120, Math.floor(top / 3)), a - 15)
     return ask(
       ctx,
       L(`Find the difference.`, `Bestimme die Differenz.`, `Halla la diferencia.`),
@@ -514,8 +522,9 @@ export function g3mdB(ctx: Ctx) {
 }
 
 export function g3mdC(ctx: Ctx) {
-  const w = ctx.rng.int(2, 9)
-  const h = ctx.rng.int(2, 8)
+  const top = knobNum(ctx, 'max', 9)
+  const w = ctx.rng.int(2, top)
+  const h = ctx.rng.int(2, top - 1)
   if (ctx.mode === 'missing') {
     return ask(
       ctx,
@@ -547,8 +556,9 @@ export function g3mdC(ctx: Ctx) {
 }
 
 export function g3mdD(ctx: Ctx) {
-  const w = ctx.rng.int(3, 12)
-  const h = ctx.rng.int(2, 9)
+  const top = knobNum(ctx, 'max', 12)
+  const w = ctx.rng.int(3, top)
+  const h = ctx.rng.int(2, top - 3)
   const peri = 2 * (w + h)
   if (ctx.mode === 'missing') {
     return ask(
@@ -632,8 +642,11 @@ export function g3g(ctx: Ctx) {
       { type: 'shape', shape: 'rectangle' },
     )
   }
-  const shape = ctx.rng.pick(['square', 'rectangle', 'triangle', 'pentagon', 'hexagon'] as const)
-  const names = (['square', 'rectangle', 'triangle', 'pentagon', 'hexagon'] as const).filter((item) => item !== shape).slice(0, 3)
+  // Pentagons and hexagons join the names only when the advanced toggle is on.
+  const basic: (keyof typeof SHAPE_LABEL)[] = ['square', 'rectangle', 'triangle']
+  const pool: (keyof typeof SHAPE_LABEL)[] = knobBool(ctx, 'advanced', true) ? [...basic, 'pentagon', 'hexagon'] : basic
+  const shape = ctx.rng.pick(pool)
+  const names = pool.filter((item) => item !== shape).slice(0, 3)
   const pack = textChoice(SHAPE_LABEL[shape], names.map((item) => SHAPE_LABEL[item]), ctx.rng)
   return ask(
     ctx,

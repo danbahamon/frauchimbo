@@ -1,91 +1,17 @@
 import { useEffect, useState } from 'react'
 import { getSkill } from '../data/skills'
 import { statsBySkill, strandAccuracy } from '../engine/insights'
-import type { Answer, DomainId, KnobValues, Locale, Question, Skill } from '../lib/types'
+import type { DomainId } from '../lib/types'
 import { encodeShare, t, tx } from '../lib/i18n'
 import { localeTag } from '../lib/math'
+import { answerText } from '../lib/review'
 import { useStore } from '../state'
 import { QuestionStem, groupBySkill } from './visuals'
 import { MathText } from './MathText'
 
-export function KnobEditor({ skill, values, locale, onChange }: { skill: Skill; values: KnobValues; locale: Locale; onChange: (next: KnobValues) => void }) {
-  return (
-    <div className="stack">
-      {skill.knobs.map((knob) => {
-        if (knob.kind === 'range') {
-          const value = Number(values[knob.id] ?? knob.min)
-          return (
-            <div className="row" key={knob.id}>
-              <span className="fine">{tx(locale, knob.label)}</span>
-              <button type="button" className="icon-btn" onClick={() => onChange({ ...values, [knob.id]: Math.max(knob.min, Number((value - knob.step).toFixed(4))) })}>−</button>
-              <b>{value}</b>
-              <button type="button" className="icon-btn" onClick={() => onChange({ ...values, [knob.id]: Math.min(knob.max, Number((value + knob.step).toFixed(4))) })}>+</button>
-            </div>
-          )
-        }
-        if (knob.kind === 'toggle') {
-          const on = Boolean(values[knob.id])
-          return (
-            <button key={knob.id} type="button" className="chip" data-on={on} onClick={() => onChange({ ...values, [knob.id]: !on })}>
-              {tx(locale, knob.label)}: {t(locale, on ? 'on' : 'off')}
-            </button>
-          )
-        }
-        const current = String(values[knob.id] ?? knob.options[0]?.value ?? '')
-        return (
-          <div key={knob.id}>
-            <div className="fine">{tx(locale, knob.label)}</div>
-            <div className="row">
-              {knob.options.map((option) => (
-                <button key={option.value} type="button" className="chip" data-on={current === option.value} onClick={() => onChange({ ...values, [knob.id]: option.value })}>
-                  {tx(locale, option.label)}
-                </button>
-              ))}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-export function DiffPips({ value, locale, onChange }: { value: number; locale: Locale; onChange: (next: number) => void }) {
-  return (
-    <div className="row">
-      <span className="fine">{t(locale, 'play.level')}</span>
-      {[1, 2, 3, 4, 5].map((level) => (
-        <button key={level} type="button" className="chip" data-on={value === level} onClick={() => onChange(level)}>
-          {t(locale, `diff.${level}`)}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 function clock(ms: number) {
   const total = Math.max(0, Math.round(ms / 1000))
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
-}
-
-function brief(question: Question, answer: Answer | null, locale: Locale, blank: string) {
-  if (!answer) return blank
-  if (answer.kind === 'number') return String(answer.value)
-  if (answer.kind === 'fraction') return `${answer.whole ? `${answer.whole} ` : ''}${answer.n}/${answer.d}`
-  if (answer.kind === 'compare') return answer.sign
-  if (answer.kind === 'choice' && question.response.type === 'choice') {
-    const option = question.response.options.find((item) => item.id === answer.id)
-    return option ? tx(locale, option.label) : answer.id
-  }
-  if (answer.kind === 'points') return answer.points.map((point) => `(${point.x}, ${point.y})`).join(' ')
-  if (answer.kind === 'clock') return `${answer.h}:${String(answer.m).padStart(2, '0')}`
-  if (answer.kind === 'ratio') return `${answer.a}:${answer.b}`
-  if (answer.kind === 'digits') return answer.digits.join('')
-  if (answer.kind === 'shade') return String(answer.count)
-  if (answer.kind === 'angle') return `${answer.degrees}°`
-  if (answer.kind === 'chart') return answer.values.join(', ')
-  if (answer.kind === 'order') return answer.ids.join(' → ')
-  if (answer.kind === 'multi') return Object.entries(answer.parts).map(([key, value]) => `${key} ${value}`).join(' · ')
-  return blank
 }
 
 export function PrintSheet() {
@@ -181,8 +107,8 @@ export function PrintSheet() {
                         <QuestionStem question={question} locale={locale} />
                         {printJob.kind === 'blank' ? (question.response.type === 'coordinate' ? null : <div className="write-line">&nbsp;</div>) : (
                           <p>
-                            {test.correct[index] ? '✓' : '×'} {clock(test.times[index] ?? 0)} · {brief(question, test.responses[index], locale, t(locale, 'inv.blank'))}
-                            {miss ? ` → ${brief(question, question.answer, locale, '')}` : ''}
+                            {test.correct[index] ? '✓' : '×'} {clock(test.times[index] ?? 0)} · {answerText(question, test.responses[index], locale, t(locale, 'inv.blank'))}
+                            {miss ? ` → ${answerText(question, question.answer, locale, '')}` : ''}
                           </p>
                         )}
                         {miss ? (

@@ -4,6 +4,7 @@ import {
   ask,
   expression,
   frac,
+  knobBool,
   knobFlag,
   knobNum,
   L,
@@ -14,7 +15,7 @@ import {
   textChoice,
   type Ctx,
 } from './shared'
-import { addWithin, avoidTie } from './ops'
+import { avoidTie } from './ops'
 
 const SYMMETRY: { shape: 'square' | 'rectangle' | 'triangle' | 'pentagon' | 'hexagon' | 'rhombus' | 'trapezoid' | 'parallelogram' | 'scalene'; lines: number }[] = [
   { shape: 'square', lines: 4 },
@@ -29,9 +30,10 @@ const SYMMETRY: { shape: 'square' | 'rectangle' | 'triangle' | 'pentagon' | 'hex
 ]
 
 export function g4oaA(ctx: Ctx) {
+  const top = knobNum(ctx, 'max', 15)
   const boxes = ctx.rng.int(4, 9)
-  const each = ctx.rng.int(6, 15)
-  const extra = ctx.rng.int(8, 30)
+  const each = ctx.rng.int(6, top)
+  const extra = ctx.rng.int(8, top * 2)
   const total = boxes * each + extra
   if (ctx.mode === 'three' || knobFlag(ctx, 'remain')) {
     const people = ctx.rng.int(3, 8)
@@ -91,9 +93,10 @@ export function g4oaA(ctx: Ctx) {
 }
 
 export function g4oaB(ctx: Ctx) {
+  const top = knobNum(ctx, 'max', 20)
   if (ctx.mode === 'gcf' || ctx.mode === 'lcm') {
-    const a = ctx.rng.int(6, 18)
-    const b = ctx.rng.int(6, 20)
+    const a = ctx.rng.int(6, top - 2)
+    const b = ctx.rng.int(6, top)
     const value = ctx.mode === 'gcf' ? gcd(a, b) : lcm(a, b)
     return ask(
       ctx,
@@ -113,7 +116,7 @@ export function g4oaB(ctx: Ctx) {
           ],
     )
   }
-  const target = ctx.rng.int(12, 36)
+  const target = ctx.rng.int(12, top + 16)
   const factors: number[] = []
   for (let i = 2; i < target; i++) if (target % i === 0) factors.push(i)
   const good = factors[ctx.rng.int(0, factors.length - 1)] ?? 2
@@ -160,7 +163,7 @@ export function g4oaB(ctx: Ctx) {
 
 export function g4oaC(ctx: Ctx) {
   const start = ctx.rng.int(3, 20)
-  const step = ctx.rng.int(3, 12) * (ctx.rng.chance(0.25) ? -1 : 1)
+  const step = ctx.rng.int(3, knobNum(ctx, 'jump', 12)) * (ctx.rng.chance(0.25) ? -1 : 1)
   const seq = [0, 1, 2, 3, 4].map((i) => start + i * step)
   if (ctx.mode === 'rule') {
     return ask(
@@ -194,9 +197,22 @@ export function g4oaC(ctx: Ctx) {
   )
 }
 
+// Column names from the largest place down to the ones. A number with fewer places uses the last columns.
+const PLACE_NAMES = [
+  L('Hundred thousands', 'Hunderttausender', 'Centenas de millar'),
+  L('Ten thousands', 'Zehntausender', 'Decenas de millar'),
+  L('Thousands', 'Tausender', 'Millares'),
+  L('Hundreds', 'Hunderter', 'Centenas'),
+  L('Tens', 'Zehner', 'Decenas'),
+  L('Ones', 'Einer', 'Unidades'),
+]
+
 export function g4nbtA(ctx: Ctx) {
-  const digits = [ctx.rng.int(1, 9), ctx.rng.int(0, 9), ctx.rng.int(0, 9), ctx.rng.int(0, 9), ctx.rng.int(0, 9)]
-  const places = [10000, 1000, 100, 10, 1]
+  // The number has `count` places: 4 reaches the thousands, 5 adds ten thousands, 6 adds hundred thousands.
+  const count = Math.min(6, Math.max(4, knobNum(ctx, 'digits', 5)))
+  const digits = Array.from({ length: count }, (_, index) => ctx.rng.int(index === 0 ? 1 : 0, 9))
+  const places = Array.from({ length: count }, (_, index) => 10 ** (count - 1 - index))
+  const columns = PLACE_NAMES.slice(PLACE_NAMES.length - count)
   const value = digits.reduce((sum, digit, index) => sum + digit * places[index], 0)
   if (ctx.mode === 'build') {
     return ask(
@@ -204,7 +220,7 @@ export function g4nbtA(ctx: Ctx) {
       L(`Build ${n(value).en} in the place-value chart.`, `Baue ${n(value).de} in der Stellenwerttafel.`, `Arma ${n(value).es} en el tablero de valor posicional.`),
       {
         type: 'digits',
-        columns: [L('Ten thousands', 'Zehntausender', 'Decenas de millar'), L('Thousands', 'Tausender', 'Millares'), L('Hundreds', 'Hunderter', 'Centenas'), L('Tens', 'Zehner', 'Decenas'), L('Ones', 'Einer', 'Unidades')],
+        columns,
       },
       { kind: 'digits', digits },
       [
@@ -230,7 +246,7 @@ export function g4nbtA(ctx: Ctx) {
     )
   }
   if (ctx.mode === 'times') {
-    const index = ctx.rng.int(0, 3)
+    const index = ctx.rng.int(0, count - 2)
     const digit = digits[index] || 4
     const big = digit * places[index]
     const small = digit * places[index + 1]
@@ -250,7 +266,7 @@ export function g4nbtA(ctx: Ctx) {
       ],
     )
   }
-  const index = digits.findIndex((digit, i) => digit > 0 && i < 4)
+  const index = digits.findIndex((digit, i) => digit > 0 && i < count - 1)
   const use = index === -1 ? 0 : index
   return ask(
     ctx,
@@ -270,8 +286,11 @@ export function g4nbtA(ctx: Ctx) {
 
 export function g4nbtB(ctx: Ctx) {
   const digits = Math.min(4, Math.max(2, knobNum(ctx, 'digits', 3)))
+  // Every number has exactly `digits` digits: 3 means 100 to 999.
+  const lo = 10 ** (digits - 1)
+  const hi = 10 ** digits - 1
   if (ctx.mode === 'mul') {
-    const a = ctx.rng.int(12, digits > 2 ? 80 : 40)
+    const a = ctx.rng.int(lo, hi)
     const b = ctx.rng.int(3, 9)
     return ask(
       ctx,
@@ -287,7 +306,8 @@ export function g4nbtB(ctx: Ctx) {
   }
   if (ctx.mode === 'div') {
     const divisor = ctx.rng.int(2, 9)
-    const quotient = ctx.rng.int(12, digits > 2 ? 80 : 40)
+    // The quotient keeps the digit count, so the dividend stays within the chosen size.
+    const quotient = ctx.rng.int(lo, Math.floor(hi / divisor))
     const remainder = knobFlag(ctx, 'remain') ? ctx.rng.int(1, divisor - 1) : 0
     const dividend = quotient * divisor + remainder
     if (remainder) {
@@ -321,9 +341,10 @@ export function g4nbtB(ctx: Ctx) {
       expression([{ t: 'v', value: dividend }, { t: 'op', v: '÷' }, { t: 'v', value: divisor }]),
     )
   }
-  const wide = addWithin(10 ** digits)
-  const a = wide.a
-  const b = ctx.mode === 'sub' ? ctx.rng.int(10 ** (digits - 1), a - 1) : wide.b
+  let a = ctx.rng.int(lo, hi)
+  let b = ctx.rng.int(lo, hi)
+  while (b === a) b = ctx.rng.int(lo, hi)
+  if (ctx.mode === 'sub' && b > a) [a, b] = [b, a]
   const value = ctx.mode === 'sub' ? a - b : a + b
   return ask(
     ctx,
@@ -386,11 +407,12 @@ export function reducedMixed(numer: number, den: number) {
 }
 
 export function g4nfA(ctx: Ctx) {
-  const d = ctx.rng.pick([2, 3, 4, 5, 6])
+  const pool = [2, 3, 4, 5, 6, 8, 10, 12].filter((item) => item <= knobNum(ctx, 'den', 6))
+  const d = ctx.rng.pick(pool)
   const numer = ctx.rng.int(1, d - 1)
   if (ctx.mode === 'order') {
     const fracs = [0, 1, 2].map(() => {
-      const den = ctx.rng.pick([2, 3, 4, 5, 6, 8])
+      const den = ctx.rng.pick(pool)
       const num = ctx.rng.int(1, den - 1)
       return { num, den, value: num / den, id: `${num}-${den}-${ctx.rng.int(1, 9999)}` }
     })
@@ -452,7 +474,7 @@ export function g4nfA(ctx: Ctx) {
 }
 
 export function g4nfB(ctx: Ctx) {
-  const d = ctx.rng.pick([3, 4, 5, 6, 8, 10])
+  const d = ctx.rng.pick([3, 4, 5, 6, 8, 10, 12].filter((item) => item <= knobNum(ctx, 'den', 10)))
   if (ctx.mode === 'mulwhole') {
     const whole = ctx.rng.int(2, 6)
     const numer = ctx.rng.int(1, d - 1)
@@ -517,7 +539,7 @@ export function g4nfB(ctx: Ctx) {
 }
 
 export function g4nfC(ctx: Ctx) {
-  const hundred = ctx.difficulty >= 3
+  const hundred = knobBool(ctx, 'hundredths', ctx.difficulty >= 3)
   const cells = hundred ? 100 : 10
   const count = ctx.rng.int(1, hundred ? 40 : 9)
   const value = count / cells
@@ -589,7 +611,7 @@ const CONVERSIONS: { mode: string; from: Localized; to: Localized; factor: numbe
 export function g4mdA(ctx: Ctx) {
   const pool = CONVERSIONS.filter((item) => item.mode === (ctx.mode || 'metric'))
   const row = ctx.rng.pick(pool.length ? pool : CONVERSIONS)
-  const count = ctx.rng.int(2, 8)
+  const count = ctx.rng.int(2, knobNum(ctx, 'max', 8))
   return ask(
     ctx,
     L(
@@ -757,7 +779,7 @@ export function g4g(ctx: Ctx) {
       ],
     )
   }
-  const pool = ctx.difficulty < 3 ? SYMMETRY.slice(0, 4) : SYMMETRY
+  const pool = knobBool(ctx, 'allShapes', ctx.difficulty >= 3) ? SYMMETRY : SYMMETRY.slice(0, 4)
   const item = ctx.rng.pick(pool)
   return ask(
     ctx,

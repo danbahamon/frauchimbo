@@ -2,13 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { DOMAIN_COLOR, SKILLS, defaultKnobs, getSkill } from '../data/skills'
 import { CHECK_MONTHS, materialize, presetFor } from '../data/pacing'
 import { generateTest } from '../engine'
-import { isCorrect } from '../lib/grade'
+import { gradeAnswer, isCorrect } from '../lib/grade'
+import { settingsKey } from '../lib/levels'
+import { attemptDetail } from '../lib/review'
 import type { ActiveTest, Answer, Blueprint, BlueprintItem, DomainId, Grade, TestRecord } from '../lib/types'
 import { DOMAIN_ORDER } from '../lib/types'
 import { monthName, t, tx } from '../lib/i18n'
 import { monthIndex, uid } from '../lib/math'
 import { useStore } from '../state'
-import { DiffPips, KnobEditor } from '../components/chrome'
+import { Variables } from '../components/Variables'
 import { AnswerWidget } from '../components/widgets'
 import { AnswerFace, QuestionStem, StimulusView, groupBySkill } from '../components/visuals'
 import { MathText } from '../components/MathText'
@@ -204,8 +206,7 @@ function Builder() {
                 <button type="button" className="text-btn" onClick={() => setTray((current) => current.filter((_, itemIndex) => itemIndex !== index))}>{t(locale, 'test.remove')}</button>
                 {openId === key ? (
                   <div className="tray-more">
-                    <DiffPips locale={locale} value={item.difficulty} onChange={(level) => setTray((current) => current.map((row, itemIndex) => itemIndex === index ? { ...row, difficulty: level, knobs: defaultKnobs(skill, level) } : row))} />
-                    <KnobEditor skill={skill} locale={locale} values={item.knobs} onChange={(knobs) => setTray((current) => current.map((row, itemIndex) => itemIndex === index ? { ...row, knobs } : row))} />
+                    <Variables skill={skill} locale={locale} values={item.knobs} onChange={(knobs) => setTray((current) => current.map((row, itemIndex) => itemIndex === index ? { ...row, knobs } : row))} />
                   </div>
                 ) : null}
               </article>
@@ -325,8 +326,12 @@ function Runner() {
       finishedAt: Date.now(),
       investigate: null,
     }
+    // Questions were generated in blueprint order, so each position maps back to the problem type that made it.
+    const variants = stamped.blueprint.items.flatMap((item) => Array.from({ length: item.count }, () => (typeof item.knobs.mode === 'string' ? item.knobs.mode : undefined)))
     correct.forEach((ok, index) => {
       const question = stamped.questions[index]
+      const given = stamped.responses[index] ?? null
+      const grade = given ? gradeAnswer(question.answer, given) : 'blank'
       logAttempt({
         skillId: question.skillId,
         correct: ok,
@@ -334,6 +339,9 @@ function Runner() {
         difficulty: question.difficulty,
         mode: 'test',
         testId: record.id,
+        variant: variants[index],
+        result: grade,
+        ...attemptDetail(question, given, grade, locale),
       })
     })
     saveTest(record)
@@ -655,7 +663,7 @@ function Shared() {
           return (
             <article key={`${item.skillId}-${index}`} className="card pad">
               <b>{skill ? tx(locale, skill.title) : item.skillId}</b>
-              <p className="fine">{t(locale, 'test.tray', { n: item.count })} · {t(locale, `diff.${item.difficulty}`)}</p>
+              <p className="fine">{t(locale, 'test.tray', { n: item.count })}{skill ? ` · ${t(locale, settingsKey(skill, item.difficulty, item.knobs))}` : ''}</p>
             </article>
           )
         })}

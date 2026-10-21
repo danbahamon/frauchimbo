@@ -8,6 +8,12 @@ export type DomainId = 'OA' | 'NBT' | 'NF' | 'MD' | 'G' | 'RP' | 'NS' | 'EE' | '
 
 export type Position = 'review' | 'onlevel' | 'stretch'
 
+// A variable is shown only when another variable has one of the listed values (for example, a problem type).
+export interface KnobWhen {
+  id: string
+  in: string[]
+}
+
 export interface KnobRange {
   id: string
   kind: 'range'
@@ -15,6 +21,8 @@ export interface KnobRange {
   max: number
   step: number
   label: Localized
+  hint: Localized
+  when?: KnobWhen
   byDifficulty: [number, number, number, number, number]
 }
 
@@ -22,6 +30,8 @@ export interface KnobToggle {
   id: string
   kind: 'toggle'
   label: Localized
+  hint: Localized
+  when?: KnobWhen
   byDifficulty: [boolean, boolean, boolean, boolean, boolean]
 }
 
@@ -34,6 +44,8 @@ export interface KnobSelect {
   id: string
   kind: 'select'
   label: Localized
+  hint: Localized
+  when?: KnobWhen
   options: KnobOption[]
   byDifficulty: [string, string, string, string, string]
 }
@@ -189,6 +201,9 @@ export interface Profile {
   createdAt: number
 }
 
+// What kind of mistake a wrong answer was. Used by the stats deep dive.
+export type MissKind = 'blank' | 'simplify' | 'sign' | 'place' | 'close' | 'pick' | 'order' | 'read' | 'method'
+
 export interface Attempt {
   id: string
   skillId: string
@@ -198,6 +213,14 @@ export interface Attempt {
   at: number
   mode: 'practice' | 'test'
   testId?: string
+  // The problem type that produced the question, for example "compare" or "missing".
+  variant?: string
+  result?: 'correct' | 'unsimplified' | 'incorrect' | 'blank'
+  miss?: MissKind
+  // Readable detail for the "questions seen" list. Stored as text so the list stays useful after the bank changes.
+  prompt?: string
+  given?: string
+  expected?: string
 }
 
 export interface BlueprintItem {

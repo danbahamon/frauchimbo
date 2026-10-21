@@ -1,5 +1,5 @@
 import { roundTo, simplify } from '../lib/math'
-import { ask, expression, familyOf, frac, L, n, textChoice, type Ctx } from './shared'
+import { ask, expression, familyOf, frac, knobNum, L, n, textChoice, type Ctx } from './shared'
 import { fractionQuestion } from './bank4'
 import { equation } from './algebra'
 import { dataSet } from './bank6'
@@ -102,8 +102,9 @@ export function g7ns(ctx: Ctx) {
       L(`The numerator becomes ${n(value).en}, over ${n(d).en}.`, `Der Zähler wird ${n(value).de}, der Nenner bleibt ${n(d).de}.`, `El numerador queda en ${n(value).es}, sobre ${n(d).es}.`),
     ])
   }
-  const a = ctx.rng.int(-12, 12) || 4
-  const b = ctx.rng.int(-9, 9) || -3
+  const top = knobNum(ctx, 'max', 12)
+  const a = ctx.rng.int(-top, top) || 4
+  const b = ctx.rng.int(-(top - 3), top - 3) || -3
   if (ctx.mode === 'mul') {
     return ask(ctx, L('Find the product.', 'Bestimme das Produkt.', 'Halla el producto.'), { type: 'number', allowNegative: true }, { kind: 'number', value: a * b }, [
       L('Same signs give a positive product. Different signs give a negative product.', 'Gleiche Vorzeichen ergeben ein positives Produkt. Verschiedene ein negatives.', 'Signos iguales dan un producto positivo. Signos distintos, uno negativo.'),
@@ -111,8 +112,8 @@ export function g7ns(ctx: Ctx) {
     ], expression([{ t: 'v', value: a }, { t: 'op', v: '×' }, { t: 'v', value: b }]))
   }
   if (ctx.mode === 'div') {
-    const divisor = ctx.rng.int(-8, 8) || 4
-    const quotient = ctx.rng.int(-8, 8) || -3
+    const divisor = ctx.rng.int(-(top - 4), top - 4) || 4
+    const quotient = ctx.rng.int(-(top - 4), top - 4) || -3
     return ask(ctx, L('Find the quotient.', 'Bestimme den Quotienten.', 'Halla el cociente.'), { type: 'number', allowNegative: true }, { kind: 'number', value: quotient }, [
       L('Division uses the same sign rules as multiplication.', 'Die Division nutzt dieselben Vorzeichenregeln wie die Multiplikation.', 'La división usa las mismas reglas de signo que la multiplicación.'),
       L(`${n(divisor * quotient).en} ÷ ${n(divisor).en} = ${n(quotient).en}.`, `${n(divisor * quotient).de} ÷ ${n(divisor).de} = ${n(quotient).de}.`, `${n(divisor * quotient).es} ÷ ${n(divisor).es} = ${n(quotient).es}.`),
@@ -131,8 +132,9 @@ export function g7ns(ctx: Ctx) {
 }
 
 export function g7eeA(ctx: Ctx) {
-  const a = ctx.rng.int(2, 6)
-  const b = ctx.rng.int(2, 8)
+  const top = knobNum(ctx, 'max', 8)
+  const a = ctx.rng.int(2, top - 2)
+  const b = ctx.rng.int(2, top)
   if (ctx.mode === 'factor') {
     const pack = textChoice(L(`${n(a).en}(x + ${n(b).en})`, `${n(a).de}(x + ${n(b).de})`, `${n(a).es}(x + ${n(b).es})`), [
       L(`${n(a).en}(x + ${n(a * b).en})`, `${n(a).de}(x + ${n(a * b).de})`, `${n(a).es}(x + ${n(a * b).es})`),
@@ -166,7 +168,7 @@ export function g7eeB(ctx: Ctx) {
 }
 
 export function g7gA(ctx: Ctx) {
-  const scale = ctx.rng.int(2, 5)
+  const scale = ctx.rng.int(2, knobNum(ctx, 'factor', 5))
   const drawing = ctx.rng.int(3, 9)
   if (ctx.mode === 'area') {
     const area = ctx.rng.int(4, 12)
@@ -189,7 +191,7 @@ export function g7gA(ctx: Ctx) {
 
 export function g7gB(ctx: Ctx) {
   if (ctx.mode === 'circ' || ctx.mode === 'area') {
-    const r = ctx.rng.int(2, 10)
+    const r = ctx.rng.int(2, knobNum(ctx, 'radius', 10))
     const value = ctx.mode === 'circ' ? roundTo(2 * 3.14 * r, 2) : roundTo(3.14 * r * r, 2)
     return ask(
       ctx,

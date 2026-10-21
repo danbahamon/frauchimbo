@@ -1,12 +1,13 @@
 import { roundHalfUp, roundTo } from '../lib/math'
-import { ask, expression, frac, knobFlag, L, n, scene, textChoice, type Ctx } from './shared'
+import { ask, expression, frac, knobBool, knobFlag, knobNum, L, n, scene, textChoice, type Ctx } from './shared'
 import { fractionQuestion, g4mdA, g4nbtB, reducedMixed } from './bank4'
 import { avoidTie } from './ops'
 
 export function g5oaA(ctx: Ctx) {
-  const a = ctx.rng.int(2, 9)
-  const b = ctx.rng.int(2, 8)
-  const c = ctx.rng.int(2, 6)
+  const top = knobNum(ctx, 'max', 9)
+  const a = ctx.rng.int(2, top)
+  const b = ctx.rng.int(2, top - 1)
+  const c = ctx.rng.int(2, top - 3)
   if (ctx.mode === 'words') {
     const pack = textChoice(
       L(`(${n(a).en} + ${n(b).en}) × ${n(c).en}`, `(${n(a).de} + ${n(b).de}) × ${n(c).de}`, `(${n(a).es} + ${n(b).es}) × ${n(c).es}`),
@@ -57,7 +58,7 @@ export function g5oaA(ctx: Ctx) {
 }
 
 export function g5oaB(ctx: Ctx) {
-  const stepA = ctx.rng.int(2, 6)
+  const stepA = ctx.rng.int(2, knobNum(ctx, 'max', 6))
   const stepB = stepA * ctx.rng.int(2, 3)
   const term = ctx.rng.int(3, 6)
   const a = stepA * term
@@ -80,18 +81,21 @@ export function g5oaB(ctx: Ctx) {
 
 export function g5nbtA(ctx: Ctx) {
   if (ctx.mode === 'compare') {
-    const a = roundTo(ctx.rng.int(100, 999) / 100, 2)
-    let b = roundTo(ctx.rng.int(100, 999) / 100, 2)
-    if (a === b) b = roundTo(a + 0.1, 2)
+    // The decimal places come from the variable: 2 gives hundredths (1.25), 1 gives tenths (1.2).
+    const places = Math.min(3, Math.max(1, knobNum(ctx, 'decimals', 2)))
+    const scale = 10 ** places
+    const a = roundTo(ctx.rng.int(scale, 10 * scale - 1) / scale, places)
+    let b = roundTo(ctx.rng.int(scale, 10 * scale - 1) / scale, places)
+    if (a === b) b = roundTo(a + 1 / scale, places)
     const sign = a < b ? '<' : a > b ? '>' : '='
     return ask(
       ctx,
       L('Which sign is true?', 'Welches Zeichen stimmt?', '¿Qué signo es cierto?'),
-      { type: 'compare', left: n(a, 2), right: n(b, 2) },
+      { type: 'compare', left: n(a, places), right: n(b, places) },
       { kind: 'compare', sign },
       [
         L('Compare whole numbers, then tenths, then hundredths.', 'Vergleiche zuerst die Ganzen, dann die Zehntel, dann die Hundertstel.', 'Compara los enteros, luego los décimos y después los centésimos.'),
-        L(`${n(a, 2).en} ${sign} ${n(b, 2).en}.`, `${n(a, 2).de} ${sign} ${n(b, 2).de}.`, `${n(a, 2).es} ${sign} ${n(b, 2).es}.`),
+        L(`${n(a, places).en} ${sign} ${n(b, places).en}.`, `${n(a, places).de} ${sign} ${n(b, places).de}.`, `${n(a, places).es} ${sign} ${n(b, places).es}.`),
       ],
     )
   }
@@ -164,7 +168,7 @@ export function g5nbtA(ctx: Ctx) {
 
 export function g5nbtB(ctx: Ctx) {
   if (ctx.mode === 'mul' || ctx.mode === 'div') {
-    return g4nbtB({ ...ctx, mode: ctx.mode, knobs: { ...ctx.knobs, digits: 3, remain: false } })
+    return g4nbtB({ ...ctx, mode: ctx.mode, knobs: { ...ctx.knobs, digits: knobNum(ctx, 'digits', 3), remain: false } })
   }
   if (ctx.mode === 'muldec' || ctx.mode === 'divdec') {
     const aT = ctx.rng.int(2, 12)
@@ -217,8 +221,9 @@ export function g5nbtB(ctx: Ctx) {
 }
 
 export function g5nfA(ctx: Ctx) {
-  const d1 = ctx.rng.pick([2, 3, 4, 6])
-  const d2 = ctx.rng.pick([3, 4, 5, 8].filter((d) => d !== d1))
+  const den = knobNum(ctx, 'den', 8)
+  const d1 = ctx.rng.pick([2, 3, 4, 5, 6, 8, 10, 12].filter((d) => d <= den))
+  const d2 = ctx.rng.pick([3, 4, 5, 6, 8, 10, 12].filter((d) => d <= den && d !== d1))
   const n1 = ctx.rng.int(1, d1 - 1)
   const n2 = ctx.rng.int(1, d2 - 1)
   const common = (d1 * d2) / gcdSafe(d1, d2)
@@ -274,10 +279,12 @@ function gcdSafe(a: number, b: number): number {
 }
 
 export function g5nfB(ctx: Ctx) {
+  // The largest denominator the variable allows. Every mode keeps its denominators at or under this value.
+  const cap = knobNum(ctx, 'den', 8)
   if (ctx.mode === 'divwhole' || ctx.mode === 'divunit') {
     if (ctx.mode === 'divwhole') {
       const whole = ctx.rng.int(2, 6)
-      const den = ctx.rng.pick([2, 3, 4, 5])
+      const den = ctx.rng.pick([2, 3, 4, 5, 6, 8, 10, 12].filter((d) => d <= cap))
       return fractionQuestion(ctx, whole * den, 1, L(
         `What is ${n(whole).en} ÷ ${frac(0, 1, den)}?`,
         `Wie viel ist ${n(whole).de} ÷ ${frac(0, 1, den)}?`,
@@ -288,7 +295,7 @@ export function g5nfB(ctx: Ctx) {
       ])
     }
     const a = ctx.rng.pick([2, 3, 4])
-    const b = ctx.rng.pick([2, 3, 4, 5, 8])
+    const b = ctx.rng.pick([2, 3, 4, 5, 6, 8, 10, 12].filter((d) => d <= cap))
     return fractionQuestion(ctx, b, a, L(
       `What is ${frac(0, 1, a)} ÷ ${frac(0, 1, b)}?`,
       `Wie viel ist ${frac(0, 1, a)} ÷ ${frac(0, 1, b)}?`,
@@ -300,7 +307,7 @@ export function g5nfB(ctx: Ctx) {
   }
   if (ctx.mode === 'mulwhole') {
     const whole = ctx.rng.int(8, 36)
-    const den = ctx.rng.pick([2, 3, 4, 5, 6])
+    const den = ctx.rng.pick([2, 3, 4, 5, 6, 8, 10, 12].filter((d) => d <= cap))
     const numer = ctx.rng.int(1, den - 1)
     return fractionQuestion(ctx, whole * numer, den, L(
       `What is ${frac(0, numer, den)} of ${n(whole).en}?`,
@@ -312,9 +319,9 @@ export function g5nfB(ctx: Ctx) {
     ])
   }
   const n1 = ctx.rng.int(1, 5)
-  const d1 = ctx.rng.int(n1 + 1, 8)
+  const d1 = ctx.rng.int(n1 + 1, cap)
   const n2 = ctx.rng.int(1, 5)
-  const d2 = ctx.rng.int(n2 + 1, 8)
+  const d2 = ctx.rng.int(n2 + 1, cap)
   return fractionQuestion(ctx, n1 * n2, d1 * d2, L(
     `What is ${frac(0, n1, d1)} × ${frac(0, n2, d2)}?`,
     `Wie viel ist ${frac(0, n1, d1)} × ${frac(0, n2, d2)}?`,
@@ -377,9 +384,10 @@ export function g5mdB(ctx: Ctx) {
 }
 
 export function g5mdC(ctx: Ctx) {
-  const l = ctx.rng.int(2, 8)
-  const w = ctx.rng.int(2, 6)
-  const h = ctx.rng.int(2, 5)
+  const top = knobNum(ctx, 'max', 8)
+  const l = ctx.rng.int(2, top)
+  const w = ctx.rng.int(2, top - 2)
+  const h = ctx.rng.int(2, top - 3)
   if (ctx.mode === 'layers') {
     return ask(
       ctx,
@@ -420,8 +428,13 @@ export function g5mdC(ctx: Ctx) {
 }
 
 export function g5gA(ctx: Ctx) {
-  const x = ctx.rng.int(0, 8)
-  const y = ctx.rng.int(0, 8)
+  // The first quadrant by default. The quadrants toggle opens negative coordinates on every axis.
+  const top = knobNum(ctx, 'max', 8)
+  const four = knobBool(ctx, 'quadrants', false)
+  const low = four ? -top : 0
+  const grid = { xMin: low, xMax: top, yMin: low, yMax: top }
+  const x = ctx.rng.int(low, top)
+  const y = ctx.rng.int(low, top)
   if (ctx.mode === 'read') {
     return ask(
       ctx,
@@ -429,8 +442,8 @@ export function g5gA(ctx: Ctx) {
       {
         type: 'multi',
         fields: [
-          { id: 'x', label: L('x', 'x', 'x'), allowNegative: false },
-          { id: 'y', label: L('y', 'y', 'y'), allowNegative: false },
+          { id: 'x', label: L('x', 'x', 'x'), allowNegative: four },
+          { id: 'y', label: L('y', 'y', 'y'), allowNegative: four },
         ],
       },
       { kind: 'multi', parts: { x, y } },
@@ -438,11 +451,11 @@ export function g5gA(ctx: Ctx) {
         L('Move along the x-axis first, then up to the point.', 'Gehe zuerst entlang der x-Achse, dann nach oben zum Punkt.', 'Muévete primero por el eje x y luego sube hasta el punto.'),
         L(`The point is (${n(x).en}, ${n(y).en}).`, `Der Punkt ist (${n(x).de}, ${n(y).de}).`, `El punto es (${n(x).es}, ${n(y).es}).`),
       ],
-      { type: 'coord', xMin: 0, xMax: 8, yMin: 0, yMax: 8, points: [{ x, y }] },
+      { type: 'coord', ...grid, points: [{ x, y }] },
     )
   }
   if (ctx.mode === 'distance') {
-    const y2 = ctx.rng.int(0, 8)
+    const y2 = ctx.rng.int(low, top)
     const dist = Math.abs(y2 - y)
     return ask(
       ctx,
@@ -457,13 +470,13 @@ export function g5gA(ctx: Ctx) {
         L('The x-coordinates match, so the distance is the difference of the y-coordinates.', 'Die x-Koordinaten stimmen überein, also ist der Abstand die Differenz der y-Koordinaten.', 'Las coordenadas x coinciden, así que la distancia es la diferencia de las coordenadas y.'),
         L(`|${n(y).en} − ${n(y2).en}| = ${n(dist).en}.`, `|${n(y).de} − ${n(y2).de}| = ${n(dist).de}.`, `|${n(y).es} − ${n(y2).es}| = ${n(dist).es}.`),
       ],
-      { type: 'coord', xMin: 0, xMax: 8, yMin: 0, yMax: 8, points: [{ x, y }, { x, y: y2 }] },
+      { type: 'coord', ...grid, points: [{ x, y }, { x, y: y2 }] },
     )
   }
   return ask(
     ctx,
     L(`Plot the point (${n(x).en}, ${n(y).en}).`, `Setze den Punkt (${n(x).de}, ${n(y).de}).`, `Marca el punto (${n(x).es}, ${n(y).es}).`),
-    { type: 'coordinate', xMin: 0, xMax: 8, yMin: 0, yMax: 8 },
+    { type: 'coordinate', ...grid },
     { kind: 'points', points: [{ x, y }] },
     [
       L('Start at the origin. Move x units to the right, then y units up.', 'Beginne im Ursprung. Gehe x Einheiten nach rechts, dann y Einheiten nach oben.', 'Empieza en el origen. Muévete x unidades a la derecha y luego y unidades hacia arriba.'),

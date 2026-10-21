@@ -1,6 +1,7 @@
 import { DOMAIN_COLOR, getSkill } from '../data/skills'
 import { suggest } from '../engine/insights'
 import { t, tx } from '../lib/i18n'
+import { levelKey } from '../lib/levels'
 import { practiceStreak } from '../lib/math'
 import { useStore } from '../state'
 import { Icon } from '../components/Icon'
@@ -61,7 +62,7 @@ export function Home() {
           <span>
             <small className="kicker">{t(locale, 'home.suggest')}</small>
             <b>{tx(locale, skill.title)}</b>
-            <small>{t(locale, `reason.${lead.reason}`)} · {t(locale, `diff.${lead.difficulty}`)}</small>
+            <small>{t(locale, `reason.${lead.reason}`)} · {t(locale, levelKey(lead.difficulty))}</small>
           </span>
         </button>
       ) : null}

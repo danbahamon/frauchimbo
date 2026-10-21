@@ -7,15 +7,6 @@ export function avoidTie(value: number, place: number) {
   return value
 }
 
-export function addWithin(span: number) {
-  const digits = String(span).length
-  const lo = 10 ** (digits - 1)
-  const hi = span
-  const a = lo + Math.floor(Math.random() * (hi - lo))
-  const b = lo + Math.floor(Math.random() * (hi - lo))
-  return { a, b }
-}
-
 export function complement(ctx: Ctx, whole: number) {
   const known = ctx.rng.int(15, whole - 15)
   return { known, missing: whole - known }

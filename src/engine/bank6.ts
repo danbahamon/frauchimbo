@@ -1,11 +1,12 @@
 import { gcd, lcm, roundTo } from '../lib/math'
-import { ask, expression, frac, L, n, scene, shuffleNotSorted, textChoice, type Ctx } from './shared'
+import { ask, expression, frac, knobNum, L, n, scene, shuffleNotSorted, textChoice, type Ctx } from './shared'
 import { fractionQuestion } from './bank4'
 import { equation } from './algebra'
 
 export function g6rp(ctx: Ctx) {
-  const a = ctx.rng.int(2, 6)
-  const b = ctx.rng.int(2, 8)
+  const top = knobNum(ctx, 'max', 8)
+  const a = ctx.rng.int(2, top - 2)
+  const b = ctx.rng.int(2, top)
   if (ctx.mode === 'build') {
     return ask(ctx, L(`Build a ratio equal to ${n(a).en}:${n(b).en}.`, `Baue ein Verhältnis gleich ${n(a).de}:${n(b).de}.`, `Arma una razón igual a ${n(a).es}:${n(b).es}.`), { type: 'ratio', max: 16 }, { kind: 'ratio', a, b }, [
       L('Multiply both parts by the same number.', 'Multipliziere beide Teile mit derselben Zahl.', 'Multiplica ambas partes por el mismo número.'),
@@ -36,6 +37,7 @@ export function g6rp(ctx: Ctx) {
 }
 
 export function g6nsA(ctx: Ctx) {
+  const cap = knobNum(ctx, 'den', 8)
   if (ctx.mode === 'word') {
     const pieces = ctx.rng.int(2, 5)
     const each = ctx.rng.pick([2, 3, 4])
@@ -46,17 +48,18 @@ export function g6nsA(ctx: Ctx) {
   }
   if (ctx.mode === 'whole') {
     const whole = ctx.rng.int(2, 7)
-    const den = ctx.rng.pick([2, 3, 4, 5])
+    const den = ctx.rng.pick([2, 3, 4, 5, 6, 8, 10, 12].filter((d) => d <= cap))
     const numer = ctx.rng.int(1, den - 1)
     return fractionQuestion(ctx, whole * den, numer, L(`What is ${n(whole).en} ÷ ${frac(0, numer, den)}?`, `Wie viel ist ${n(whole).de} ÷ ${frac(0, numer, den)}?`, `¿Cuánto es ${n(whole).es} ÷ ${frac(0, numer, den)}?`), [
       L('Multiply by the reciprocal.', 'Multipliziere mit dem Kehrwert.', 'Multiplica por el recíproco.'),
       L(`${n(whole).en} × ${frac(0, den, numer)} = ${frac(0, whole * den, numer)}.`, `${n(whole).de} × ${frac(0, den, numer)} = ${frac(0, whole * den, numer)}.`, `${n(whole).es} × ${frac(0, den, numer)} = ${frac(0, whole * den, numer)}.`),
     ])
   }
-  const n1 = ctx.rng.int(1, 5)
-  const d1 = ctx.rng.int(n1 + 1, 8)
-  const n2 = ctx.rng.int(1, 4)
-  const d2 = ctx.rng.int(n2 + 1, 7)
+  // Numerators stay below their denominators, whatever the largest denominator is.
+  const n1 = ctx.rng.int(1, Math.min(5, cap - 1))
+  const d1 = ctx.rng.int(n1 + 1, cap)
+  const n2 = ctx.rng.int(1, Math.min(4, cap - 2))
+  const d2 = ctx.rng.int(n2 + 1, cap - 1)
   return fractionQuestion(ctx, n1 * d2, d1 * n2, L(`What is ${frac(0, n1, d1)} ÷ ${frac(0, n2, d2)}?`, `Wie viel ist ${frac(0, n1, d1)} ÷ ${frac(0, n2, d2)}?`, `¿Cuánto es ${frac(0, n1, d1)} ÷ ${frac(0, n2, d2)}?`), [
     L(`Multiply by ${frac(0, d2, n2)}.`, `Multipliziere mit ${frac(0, d2, n2)}.`, `Multiplica por ${frac(0, d2, n2)}.`),
     L(`${frac(0, n1, d1)} × ${frac(0, d2, n2)} = ${frac(0, n1 * d2, d1 * n2)}.`, `${frac(0, n1, d1)} × ${frac(0, d2, n2)} = ${frac(0, n1 * d2, d1 * n2)}.`, `${frac(0, n1, d1)} × ${frac(0, d2, n2)} = ${frac(0, n1 * d2, d1 * n2)}.`),
@@ -64,9 +67,10 @@ export function g6nsA(ctx: Ctx) {
 }
 
 export function g6nsB(ctx: Ctx) {
+  const top = knobNum(ctx, 'max', 36)
   if (ctx.mode === 'gcf' || ctx.mode === 'lcm') {
-    const a = ctx.rng.int(8, 36)
-    const b = ctx.rng.int(8, 40)
+    const a = ctx.rng.int(8, top)
+    const b = ctx.rng.int(8, top + 4)
     const value = ctx.mode === 'gcf' ? gcd(a, b) : lcm(a, b)
     return ask(ctx, ctx.mode === 'gcf' ? L(`Greatest common factor of ${n(a).en} and ${n(b).en}?`, `Größter gemeinsamer Faktor von ${n(a).de} und ${n(b).de}?`, `¿Máximo común divisor de ${n(a).es} y ${n(b).es}?`) : L(`Least common multiple of ${n(a).en} and ${n(b).en}?`, `Kleinstes gemeinsames Vielfaches von ${n(a).de} und ${n(b).de}?`, `¿Mínimo común múltiplo de ${n(a).es} y ${n(b).es}?`), { type: 'number' }, { kind: 'number', value }, [
       L(ctx.mode === 'gcf' ? 'It is the greatest factor shared by both numbers.' : 'It is the smallest positive multiple shared by both numbers.', ctx.mode === 'gcf' ? 'Es ist der größte Faktor, den beide Zahlen teilen.' : 'Es ist das kleinste positive Vielfache, das beide Zahlen teilen.', ctx.mode === 'gcf' ? 'Es el mayor factor que comparten ambos números.' : 'Es el menor múltiplo positivo que comparten ambos números.'),
@@ -90,17 +94,20 @@ export function g6nsB(ctx: Ctx) {
 }
 
 export function g6nsC(ctx: Ctx) {
+  // The largest distance from zero any number in this set can reach.
+  const span = knobNum(ctx, 'span', 5)
   if (ctx.mode === 'abs') {
-    const value = ctx.rng.int(-12, -1)
+    const value = ctx.rng.int(-span, -1)
     return ask(ctx, L(`What is |${n(value).en}|?`, `Wie groß ist |${n(value).de}|?`, `¿Cuánto es |${n(value).es}|?`), { type: 'number' }, { kind: 'number', value: -value }, [
       L('Absolute value is the distance from zero.', 'Der Betrag ist der Abstand von null.', 'El valor absoluto es la distancia desde cero.'),
       L(`|${n(value).en}| = ${n(-value).en}.`, `|${n(value).de}| = ${n(-value).de}.`, `|${n(value).es}| = ${n(-value).es}.`),
     ])
   }
   if (ctx.mode === 'plot') {
-    const x = ctx.rng.int(-5, 5)
-    const y = ctx.rng.int(-5, 5)
-    return ask(ctx, L(`Plot (${n(x).en}, ${n(y).en}).`, `Setze (${n(x).de}, ${n(y).de}).`, `Marca (${n(x).es}, ${n(y).es}).`), { type: 'coordinate', xMin: -6, xMax: 6, yMin: -6, yMax: 6 }, { kind: 'points', points: [{ x, y }] }, [
+    const x = ctx.rng.int(-span, span)
+    const y = ctx.rng.int(-span, span)
+    const edge = span + 1
+    return ask(ctx, L(`Plot (${n(x).en}, ${n(y).en}).`, `Setze (${n(x).de}, ${n(y).de}).`, `Marca (${n(x).es}, ${n(y).es}).`), { type: 'coordinate', xMin: -edge, xMax: edge, yMin: -edge, yMax: edge }, { kind: 'points', points: [{ x, y }] }, [
       L('Negative x goes left. Negative y goes down.', 'Negatives x geht nach links. Negatives y geht nach unten.', 'Una x negativa va a la izquierda. Una y negativa va hacia abajo.'),
       L(`The point is (${n(x).en}, ${n(y).en}).`, `Der Punkt ist (${n(x).de}, ${n(y).de}).`, `El punto es (${n(x).es}, ${n(y).es}).`),
     ])
@@ -115,7 +122,7 @@ export function g6nsC(ctx: Ctx) {
       L(`The order is ${[...values].sort((a, b) => a - b).map((value) => n(value).en).join(', ')}.`, `Die Reihenfolge ist ${[...values].sort((a, b) => a - b).map((value) => n(value).de).join(', ')}.`, `El orden es ${[...values].sort((a, b) => a - b).map((value) => n(value).es).join(', ')}.`),
     ])
   }
-  const a = ctx.rng.int(-9, 6)
+  const a = ctx.rng.int(-(span + 4), span)
   const b = a + ctx.rng.int(1, 5)
   return ask(ctx, L('Which sign is true?', 'Welches Zeichen stimmt?', '¿Qué signo es cierto?'), { type: 'compare', left: n(a), right: n(b) }, { kind: 'compare', sign: '<' }, [
     L('The number farther left is smaller.', 'Die weiter links stehende Zahl ist kleiner.', 'El número más a la izquierda es menor.'),
@@ -155,7 +162,7 @@ export function g6eeA(ctx: Ctx) {
 
 export function g6eeB(ctx: Ctx) {
   if (ctx.mode === 'ineq') {
-    const boundary = ctx.rng.int(2, 10)
+    const boundary = ctx.rng.int(2, knobNum(ctx, 'max', 9) + 1)
     const good = boundary + ctx.rng.int(1, 4)
     const pack = textChoice(n(good), [n(boundary - 2), n(boundary - 1), n(boundary)], ctx.rng)
     return ask(ctx, L(`Which value makes x > ${n(boundary).en} true?`, `Welcher Wert macht x > ${n(boundary).de} wahr?`, `¿Qué valor hace verdadera x > ${n(boundary).es}?`), { type: 'choice', options: pack.options }, pack.answer, [
@@ -167,7 +174,7 @@ export function g6eeB(ctx: Ctx) {
 }
 
 export function g6eeC(ctx: Ctx) {
-  const m = ctx.rng.int(2, 5)
+  const m = ctx.rng.int(2, knobNum(ctx, 'slope', 5))
   const b = ctx.rng.int(0, 4)
   const x = ctx.rng.int(1, 6)
   const y = m * x + b
@@ -188,9 +195,10 @@ export function g6eeC(ctx: Ctx) {
 }
 
 export function g6g(ctx: Ctx) {
+  const top = knobNum(ctx, 'max', 12)
   if (ctx.mode === 'triangle') {
-    const base = ctx.rng.int(4, 12)
-    const height = ctx.rng.int(2, 10)
+    const base = ctx.rng.int(4, top)
+    const height = ctx.rng.int(2, top - 2)
     const area = (base * height) / 2
     return ask(ctx, L('What is the area of the triangle?', 'Wie groß ist der Flächeninhalt des Dreiecks?', '¿Cuál es el área del triángulo?'), { type: 'number', allowDecimal: true }, { kind: 'number', value: area, tolerance: 0.001 }, [
       L('Half of base times height.', 'Die Hälfte von Grundseite mal Höhe.', 'La mitad de base por altura.'),
@@ -198,16 +206,16 @@ export function g6g(ctx: Ctx) {
     ], { type: 'triangle', b: base, h: height })
   }
   if (ctx.mode === 'para') {
-    const base = ctx.rng.int(4, 12)
-    const height = ctx.rng.int(3, 9)
+    const base = ctx.rng.int(4, top)
+    const height = ctx.rng.int(3, top - 3)
     return ask(ctx, L('What is the area of the parallelogram?', 'Wie groß ist der Flächeninhalt des Parallelogramms?', '¿Cuál es el área del paralelogramo?'), { type: 'number' }, { kind: 'number', value: base * height }, [
       L('Use base × perpendicular height.', 'Nimm Grundseite × senkrechte Höhe.', 'Usa base × altura perpendicular.'),
       L(`${n(base).en} × ${n(height).en} = ${n(base * height).en}.`, `${n(base).de} × ${n(height).de} = ${n(base * height).de}.`, `${n(base).es} × ${n(height).es} = ${n(base * height).es}.`),
     ], { type: 'shape', shape: 'parallelogram' })
   }
-  const l = ctx.rng.int(2, 8)
-  const w = ctx.rng.int(2, 6)
-  const h = ctx.rng.int(2, 5)
+  const l = ctx.rng.int(2, top - 4)
+  const w = ctx.rng.int(2, top - 6)
+  const h = ctx.rng.int(2, top - 7)
   if (ctx.mode === 'volume') {
     return ask(ctx, L('What is the volume?', 'Wie groß ist das Volumen?', '¿Cuál es el volumen?'), { type: 'number' }, { kind: 'number', value: l * w * h }, [
       L('Length × width × height.', 'Länge × Breite × Höhe.', 'Largo × ancho × alto.'),
@@ -255,12 +263,13 @@ export function dataSet(ctx: Ctx, size: number, mean: number) {
 
 export function g6spB(ctx: Ctx) {
   const mean = ctx.rng.int(6, 14)
-  const values = dataSet(ctx, 5, mean)
+  const values = dataSet(ctx, knobNum(ctx, 'size', 5), mean)
   if (ctx.mode === 'median') {
     const sorted = [...values].sort((a, b) => a - b)
-    return ask(ctx, L(`What is the median of ${values.map((v) => n(v).en).join(', ')}?`, `Was ist der Median von ${values.map((v) => n(v).de).join(', ')}?`, `¿Cuál es la mediana de ${values.map((v) => n(v).es).join(', ')}?`), { type: 'number' }, { kind: 'number', value: sorted[2] }, [
+    const middle = Math.floor(sorted.length / 2)
+    return ask(ctx, L(`What is the median of ${values.map((v) => n(v).en).join(', ')}?`, `Was ist der Median von ${values.map((v) => n(v).de).join(', ')}?`, `¿Cuál es la mediana de ${values.map((v) => n(v).es).join(', ')}?`), { type: 'number' }, { kind: 'number', value: sorted[middle] }, [
       L(`In order: ${sorted.map((v) => n(v).en).join(', ')}.`, `Der Reihe nach: ${sorted.map((v) => n(v).de).join(', ')}.`, `En orden: ${sorted.map((v) => n(v).es).join(', ')}.`),
-      L(`The middle value is ${n(sorted[2]).en}.`, `Der mittlere Wert ist ${n(sorted[2]).de}.`, `El valor del medio es ${n(sorted[2]).es}.`),
+      L(`The middle value is ${n(sorted[middle]).en}.`, `Der mittlere Wert ist ${n(sorted[middle]).de}.`, `El valor del medio es ${n(sorted[middle]).es}.`),
     ])
   }
   if (ctx.mode === 'range') {

@@ -3,6 +3,7 @@ import type { Answer, Locale, Response } from '../lib/types'
 import { PALETTE } from '../lib/types'
 import { decimalKey, t, tx } from '../lib/i18n'
 import { MathText } from './MathText'
+import { ShadeBar } from './ShadeBar'
 import { ClockFace, PlaneGrid, ShapeFig, planeMap } from './visuals'
 
 function useKeys(onKey: (key: string) => void, enabled: boolean) {
@@ -45,6 +46,17 @@ function useEmit(onChange: (answer: Answer | null) => void) {
   return ref
 }
 
+// Typed text where only the newest character pops in. Keying it by length replays the pop on every key press.
+function Typed({ text, empty = ' ' }: { text: string; empty?: string }) {
+  if (!text) return <>{empty}</>
+  return (
+    <>
+      {text.slice(0, -1)}
+      <span key={text.length} className="digit-pop">{text.slice(-1)}</span>
+    </>
+  )
+}
+
 function parseNumeric(text: string) {
   if (!text || text === '-' || text === '.' || text === '-.') return null
   const value = Number(text)
@@ -58,7 +70,7 @@ export function AnswerWidget({ response, locale, onChange, initial, locked = fal
   else if (response.type === 'choice') body = <ChoiceWidget response={response} locale={locale} onChange={onChange} initial={initial?.kind === 'choice' ? initial.id : ''} />
   else if (response.type === 'compare') body = <CompareWidget response={response} locale={locale} onChange={onChange} initial={initial?.kind === 'compare' ? initial.sign : null} />
   else if (response.type === 'order') body = <OrderWidget response={response} locale={locale} onChange={onChange} initial={initial?.kind === 'order' ? initial.ids : null} />
-  else if (response.type === 'numberline') body = <LineWidget response={response} onChange={onChange} initial={initial?.kind === 'number' ? initial.value : null} />
+  else if (response.type === 'numberline') body = <LineWidget response={response} locale={locale} onChange={onChange} initial={initial?.kind === 'number' ? initial.value : null} />
   else if (response.type === 'coordinate') body = <PlaneWidget response={response} locale={locale} onChange={onChange} initial={initial?.kind === 'points' ? initial.points[0] ?? null : null} reveal={reveal?.kind === 'points' && locked ? reveal.points : undefined} />
   else if (response.type === 'shade') body = <ShadeWidget response={response} locale={locale} onChange={onChange} initial={initial?.kind === 'shade' ? initial.count : 0} />
   else if (response.type === 'clock') body = <ClockWidget onChange={onChange} locale={locale} initial={initial?.kind === 'clock' ? initial : null} />
@@ -96,7 +108,7 @@ function NumberWidget({ response, locale, onChange, initial }: { response: Extra
   const shown = text.replace('.', decimalKey(locale))
   return (
     <div>
-      <div className="entry">{shown || ' '}</div>
+      <div className="entry"><Typed text={shown} /></div>
       <Pad locale={locale} allowDecimal={response.allowDecimal} allowNegative={response.allowNegative} onKey={push} />
     </div>
   )
@@ -143,11 +155,11 @@ function FractionWidget({ response, locale, onChange, initial }: { response: Ext
       <div className="fraction-entry">
         {response.allowNegative ? <button type="button" onClick={() => push('sign')}>{parts.neg ? '−' : '+'}</button> : null}
         {response.allowWhole ? (
-          <button type="button" data-hot={field === 'w'} className="frac" onClick={() => setField('w')}><b>{parts.w || '0'}</b></button>
+          <button type="button" data-hot={field === 'w'} className="frac" onClick={() => setField('w')}><b><Typed text={parts.w} empty="0" /></b></button>
         ) : null}
         <span className="frac">
-          <b><button type="button" data-hot={field === 'n'} onClick={() => setField('n')}>{parts.n || t(locale, 'widget.num')}</button></b>
-          <i><button type="button" data-hot={field === 'd'} onClick={() => setField('d')}>{parts.d || t(locale, 'widget.den')}</button></i>
+          <b><button type="button" data-hot={field === 'n'} onClick={() => setField('n')}><Typed text={parts.n} empty={t(locale, 'widget.num')} /></button></b>
+          <i><button type="button" data-hot={field === 'd'} onClick={() => setField('d')}><Typed text={parts.d} empty={t(locale, 'widget.den')} /></button></i>
         </span>
       </div>
       <p className="fine hot-caption">{t(locale, 'widget.editing', { part: field === 'w' ? t(locale, 'widget.whole') : field === 'd' ? t(locale, 'widget.den') : t(locale, 'widget.num') })}</p>
@@ -222,7 +234,7 @@ function OrderWidget({ response, locale, onChange, initial }: { response: Extrac
   )
 }
 
-function LineWidget({ response, onChange, initial }: { response: Extract<Response, { type: 'numberline' }>; onChange: (answer: Answer | null) => void; initial: number | null }) {
+function LineWidget({ response, locale, onChange, initial }: { response: Extract<Response, { type: 'numberline' }>; locale: Locale; onChange: (answer: Answer | null) => void; initial: number | null }) {
   const [value, setValue] = useState<number | null>(initial)
   const setFrom = (clientX: number, svg: SVGSVGElement) => {
     const rect = svg.getBoundingClientRect()
@@ -240,15 +252,24 @@ function LineWidget({ response, onChange, initial }: { response: Extract<Respons
       onPointerDown={(event) => setFrom(event.clientX, event.currentTarget)}
       onPointerMove={(event) => { if (event.buttons) setFrom(event.clientX, event.currentTarget) }}>
       <line x1="20" y1="40" x2="300" y2="40" stroke="currentColor" strokeWidth="3" />
-      <circle cx={x} cy="40" r="12" fill="#e25b45" />
-      <text x="160" y="72" textAnchor="middle" fontSize="14">{value == null ? '' : value}</text>
+      {/* The marker glides to each new place. Before the first tap it is a dashed ring at the start, so the line clearly needs a tap. */}
+      <g className="nl-track" style={{ transform: `translateX(${x - 20}px)` }}>
+        <circle cx="20" cy="40" r="12" className={value == null ? 'nl-marker unset' : 'nl-marker'} />
+      </g>
+      <text x="160" y="72" textAnchor="middle" fontSize="14">{value == null ? t(locale, 'widget.tapLine') : value}</text>
     </svg>
   )
 }
 
 function PlaneWidget({ response, locale, onChange, initial, reveal }: { response: Extract<Response, { type: 'coordinate' }>; locale: Locale; onChange: (answer: Answer | null) => void; initial: { x: number; y: number } | null; reveal?: { x: number; y: number }[] }) {
   const [point, setPoint] = useState(initial)
+  // Each tap leaves a ripple where it landed. The counter gives every ripple its own key, so it replays on each tap.
+  const [ripple, setRipple] = useState<{ x: number; y: number; id: number } | null>(null)
+  const taps = useRef(0)
   const map = planeMap(response.xMin, response.xMax, response.yMin, response.yMax)
+  // The crosshair runs to the axes, or to the nearest edge when the plane does not reach an axis.
+  const axisX = map.sx(Math.min(Math.max(0, response.xMin), response.xMax))
+  const axisY = map.sy(Math.min(Math.max(0, response.yMin), response.yMax))
   const pick = (event: ReactPointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
     const raw = map.fromPixel(((event.clientX - rect.left) / rect.width) * map.w, ((event.clientY - rect.top) / rect.height) * map.h)
@@ -257,12 +278,21 @@ function PlaneWidget({ response, locale, onChange, initial, reveal }: { response
       y: Math.min(response.yMax, Math.max(response.yMin, raw.y)),
     }
     setPoint(next)
+    taps.current += 1
+    setRipple({ x: map.sx(next.x), y: map.sy(next.y), id: taps.current })
     onChange({ kind: 'points', points: [next] })
   }
   return (
     <div>
       <PlaneGrid xMin={response.xMin} xMax={response.xMax} yMin={response.yMin} yMax={response.yMax} onPointerDown={pick}>
-        {point ? <circle cx={map.sx(point.x)} cy={map.sy(point.y)} r="7" fill="#e25b45" /> : null}
+        {point ? (
+          <g>
+            <line className="plane-cross" x1={map.sx(point.x)} y1={map.sy(point.y)} x2={map.sx(point.x)} y2={axisY} />
+            <line className="plane-cross" x1={map.sx(point.x)} y1={map.sy(point.y)} x2={axisX} y2={map.sy(point.y)} />
+            <circle cx={map.sx(point.x)} cy={map.sy(point.y)} r="7" fill="#e25b45" />
+          </g>
+        ) : null}
+        {ripple ? <circle key={ripple.id} className="plane-ripple" cx={ripple.x} cy={ripple.y} r="7" /> : null}
         {reveal?.map((target, index) => (
           <circle key={`reveal-${index}`} cx={map.sx(target.x)} cy={map.sy(target.y)} r="12" fill="none" stroke="#2f9e44" strokeWidth="3" strokeDasharray="5 4" />
         ))}
@@ -284,9 +314,7 @@ function ShadeWidget({ response, locale, onChange, initial }: { response: Extrac
   return (
     <div>
       <div className="fine">{t(locale, 'widget.shaded', { n: on.filter(Boolean).length })}</div>
-      <div className="grid-shade" style={{ gridTemplateColumns: `repeat(${response.cols}, 1fr)` }}>
-        {on.map((filled, index) => <button key={index} type="button" className={filled ? 'cell on' : 'cell'} onClick={() => toggle(index)} />)}
-      </div>
+      <ShadeBar rows={response.rows} cols={response.cols} on={on} locale={locale} onToggle={toggle} />
     </div>
   )
 }

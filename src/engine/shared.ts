@@ -45,6 +45,12 @@ export function knobFlag(ctx: Ctx, id: string) {
   return ctx.knobs[id] === true
 }
 
+// Like knobFlag, but a missing key falls back to the given default (for older saved sets that predate the toggle).
+export function knobBool(ctx: Ctx, id: string, fallback: boolean) {
+  const value = ctx.knobs[id]
+  return typeof value === 'boolean' ? value : fallback
+}
+
 export function familyOf(ctx: Ctx) {
   const value = ctx.knobs.family
   return typeof value === 'string' ? value : 'int'

@@ -3,7 +3,7 @@ import { defaultKnobs, SKILLS } from '../src/data/skills.ts'
 import { PRESETS, materialize } from '../src/data/pacing.ts'
 import { generateQuestion } from '../src/engine/index.ts'
 import { fractionValue } from '../src/lib/math.ts'
-import type { Answer, Question, Response } from '../src/lib/types.ts'
+import type { Answer, KnobValues, Question, Response, Skill } from '../src/lib/types.ts'
 
 function expectKind(response: Response, answer: Answer) {
   const map: Record<Response['type'], Answer['kind']> = {
@@ -66,24 +66,53 @@ function structural(question: Question) {
   if (wrong && isCorrect(question.answer, wrong)) throw new Error('mutated still correct')
 }
 
+// Every skill is exercised at its default settings for each problem type, and each variable is pushed to
+// its smallest and largest value (or both toggle states, or every choice) for each problem type it applies to.
+interface Case {
+  label: string
+  difficulty: number
+  knobs: KnobValues
+}
+
+function casesFor(skill: Skill): Case[] {
+  const cases: Case[] = []
+  const modeKnob = skill.knobs.find((knob) => knob.id === 'mode')
+  const modes: (string | null)[] = modeKnob && modeKnob.kind === 'select' ? modeKnob.options.map((option) => option.value) : [null]
+  for (const difficulty of [1, 3, 5]) {
+    const base = defaultKnobs(skill, difficulty)
+    for (const mode of modes) {
+      cases.push({ label: `defaults d${difficulty} ${mode ?? ''}`.trim(), difficulty, knobs: mode ? { ...base, mode } : base })
+    }
+    for (const knob of skill.knobs) {
+      if (knob.id === 'mode') continue
+      const values: (number | boolean | string)[] =
+        knob.kind === 'range' ? [knob.min, knob.max] : knob.kind === 'toggle' ? [true, false] : knob.options.map((option) => option.value)
+      for (const value of values) {
+        for (const mode of modes) {
+          cases.push({
+            label: `${knob.id}=${value} d${difficulty} ${mode ?? ''}`.trim(),
+            difficulty,
+            knobs: { ...base, ...(mode ? { mode } : {}), [knob.id]: value },
+          })
+        }
+      }
+    }
+  }
+  return cases
+}
+
 let failures = 0
 for (const skill of SKILLS) {
-  for (const difficulty of [1, 3, 5]) {
-    const knobs = defaultKnobs(skill, difficulty)
-    const modes = skill.knobs.find((knob) => knob.kind === 'select' && knob.id === 'mode')
-    const modeValues = modes && modes.kind === 'select' ? modes.options.map((option) => option.value) : [String(knobs.mode ?? '')]
-    for (const mode of modeValues) {
-      for (let i = 0; i < 4; i++) {
-        try {
-          const question = generateQuestion(skill, difficulty, { ...knobs, mode })
-          structural(question)
-        } catch (error) {
-          failures += 1
-          console.error(skill.id, 'd' + difficulty, mode, error instanceof Error ? error.message : error)
-          if (failures > 25) {
-            console.error('too many failures')
-            process.exit(1)
-          }
+  for (const testCase of casesFor(skill)) {
+    for (let i = 0; i < 3; i++) {
+      try {
+        structural(generateQuestion(skill, testCase.difficulty, testCase.knobs))
+      } catch (error) {
+        failures += 1
+        console.error(skill.id, testCase.label, error instanceof Error ? error.message : error)
+        if (failures > 25) {
+          console.error('too many failures')
+          process.exit(1)
         }
       }
     }
@@ -95,6 +124,24 @@ for (const preset of PRESETS) {
   if (!getKnown(blueprint.items.map((item) => item.skillId))) {
     console.error('bad preset', preset.id)
     failures += 1
+  }
+  for (const item of blueprint.items) {
+    const skill = SKILLS.find((candidate) => candidate.id === item.skillId)
+    if (!skill) continue
+    for (const [key, value] of Object.entries(item.knobs)) {
+      const knob = skill.knobs.find((candidate) => candidate.id === key)
+      const valid =
+        knob !== undefined &&
+        (knob.kind === 'range'
+          ? typeof value === 'number' && value >= knob.min && value <= knob.max
+          : knob.kind === 'toggle'
+            ? typeof value === 'boolean'
+            : knob.options.some((option) => option.value === value))
+      if (!valid) {
+        console.error('bad preset knob', preset.id, item.skillId, key, String(value))
+        failures += 1
+      }
+    }
   }
 }
 

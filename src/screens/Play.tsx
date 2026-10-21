@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getSkill, defaultKnobs } from '../data/skills'
 import { generateQuestion } from '../engine'
 import { gradeAnswer } from '../lib/grade'
@@ -6,8 +6,10 @@ import type { Answer, GradeResult, KnobValues, Question, Skill } from '../lib/ty
 import { t, tx } from '../lib/i18n'
 import { positionDifficulty } from '../lib/math'
 import { playFeedback } from '../lib/audio'
+import { settingsKey } from '../lib/levels'
+import { attemptDetail } from '../lib/review'
 import { useStore } from '../state'
-import { DiffPips, KnobEditor } from '../components/chrome'
+import { Variables } from '../components/Variables'
 import { AnswerWidget } from '../components/widgets'
 import { AnswerFace, StimulusView } from '../components/visuals'
 import { MathText } from '../components/MathText'
@@ -16,6 +18,14 @@ import { SkillDemo } from '../components/Preview'
 import { Icon } from '../components/Icon'
 
 const PRAISE = ['fb.exact', 'fb.clean', 'fb.spiral']
+
+// Plays a short CSS animation again by removing and re-adding its class, so repeated feedback still shows.
+function replay(element: HTMLElement | null, name: string) {
+  if (!element) return
+  element.classList.remove(name)
+  void element.offsetWidth
+  element.classList.add(name)
+}
 
 export function Play() {
   const store = useStore()
@@ -43,6 +53,8 @@ function Session({ skill, auto, startDifficulty }: { skill: Skill; auto: boolean
   const [began, setBegan] = useState(() => Date.now())
   const [tally, setTally] = useState({ correct: 0, total: 0, streak: 0 })
   const [why, setWhy] = useState(false)
+  // The answer area, so feedback can move the element that was right or wrong instead of the whole card.
+  const zone = useRef<HTMLDivElement>(null)
 
   const fresh = (nextDifficulty = difficulty, nextKnobs = knobs) => {
     setQuestion(generateQuestion(skill, nextDifficulty, nextKnobs))
@@ -63,10 +75,12 @@ function Session({ skill, auto, startDifficulty }: { skill: Skill; auto: boolean
     if (!question || result) return
     if (!answer) {
       flash(t(locale, 'play.need'))
+      replay(zone.current, 'nudge')
       return
     }
     const grade = gradeAnswer(question.answer, answer)
     const ok = grade === 'correct'
+    replay(zone.current, ok ? 'answer-ok' : 'nudge')
     if (!ok && misses === 0) {
       // First failed check (wrong or not yet simplified): log it once, keep the answer open, and reveal nothing yet.
       setMisses(1)
@@ -78,6 +92,9 @@ function Session({ skill, auto, startDifficulty }: { skill: Skill; auto: boolean
         timeMs: Date.now() - began,
         difficulty: question.difficulty,
         mode: 'practice',
+        variant: typeof knobs.mode === 'string' ? knobs.mode : undefined,
+        result: grade,
+        ...attemptDetail(question, answer, grade, locale),
       })
       playFeedback(false, profile.sound)
       return
@@ -96,6 +113,9 @@ function Session({ skill, auto, startDifficulty }: { skill: Skill; auto: boolean
         timeMs: Date.now() - began,
         difficulty: question.difficulty,
         mode: 'practice',
+        variant: typeof knobs.mode === 'string' ? knobs.mode : undefined,
+        result: grade,
+        ...attemptDetail(question, answer, grade, locale),
       })
     }
     playFeedback(ok, profile.sound)
@@ -127,9 +147,7 @@ function Session({ skill, auto, startDifficulty }: { skill: Skill; auto: boolean
         <button type="button" className="text-btn" onClick={() => setWhy(true)}>{t(locale, 'play.why')}</button>
         <div className="pad card" style={{ marginTop: 12 }}>
           <p className="kicker">{t(locale, 'play.setup')}</p>
-          <DiffPips locale={locale} value={difficulty} onChange={(level) => { setDifficulty(level); setKnobs(defaultKnobs(skill, level)) }} />
-          <div style={{ height: 10 }} />
-          <KnobEditor skill={skill} values={knobs} locale={locale} onChange={setKnobs} />
+          <Variables skill={skill} values={knobs} locale={locale} onChange={setKnobs} />
         </div>
         <div className="row" style={{ marginTop: 14 }}>
           <button type="button" className="ghost" onClick={leave}><Icon name="back" /> {t(locale, 'on.back')}</button>
@@ -155,7 +173,7 @@ function Session({ skill, auto, startDifficulty }: { skill: Skill; auto: boolean
   return (
     <div>
       <div className="row play-head">
-        <span className="kicker">{skill.code} · {t(locale, `diff.${question.difficulty}`)}</span>
+        <span className="kicker">{skill.code} · {t(locale, settingsKey(skill, question.difficulty, knobs))}</span>
         <span className="play-meter">
           {tally.streak >= 2 ? <span className="streak-pill"><Icon name="spark" size={14} />{t(locale, 'play.streak', { n: tally.streak })}</span> : null}
           <span className="fine">{t(locale, 'play.session', { c: tally.correct, n: tally.total })}</span>
@@ -165,10 +183,12 @@ function Session({ skill, auto, startDifficulty }: { skill: Skill; auto: boolean
         <h2>{tx(locale, skill.title)}</h2>
         <p className="prompt"><MathText text={tx(locale, question.prompt)} /></p>
         <StimulusView stimulus={question.stimulus} locale={locale} />
-        <AnswerWidget key={question.id} response={question.response} locale={locale} locked={Boolean(result)} initial={answer} onChange={setAnswer} reveal={result ? question.answer : null} />
+        <div ref={zone} className="answer-zone">
+          <AnswerWidget key={question.id} response={question.response} locale={locale} locked={Boolean(result)} initial={answer} onChange={setAnswer} reveal={result ? question.answer : null} />
+        </div>
       </div>
       {retrying ? (
-        <div className="feedback retry shake">
+        <div className="feedback retry">
           <div className="row">
             <Mascot mood="think" size={44} />
             <b>{t(locale, 'play.retry')}</b>
@@ -181,13 +201,16 @@ function Session({ skill, auto, startDifficulty }: { skill: Skill; auto: boolean
         </div>
       ) : null}
       {result ? (
-        <div className={result === 'correct' ? 'feedback ok pop' : 'feedback no shake'}>
+        <div className={result === 'correct' ? 'feedback ok pop' : 'feedback no'}>
           <div className="row">
             <Mascot mood={result === 'correct' ? 'joy' : 'think'} size={48} />
+            {result === 'correct' ? <svg className="tick" viewBox="0 0 24 24" aria-hidden="true"><path pathLength={1} d="M5 12.5 9.5 17 19 7" /></svg> : null}
             <b>{t(locale, result === 'unsimplified' ? 'fb.close' : result === 'correct' ? (misses ? 'play.second' : praise) : 'fb.miss')}</b>
           </div>
           <p className="fine">{t(locale, 'play.answer')}</p>
-          <AnswerFace question={question} answer={question.answer} locale={locale} blank="" />
+          <div className={result === 'correct' ? undefined : 'reveal-answer'}>
+            <AnswerFace question={question} answer={question.answer} locale={locale} blank="" />
+          </div>
           {offerUp ? <p>{t(locale, 'play.levelup')}</p> : null}
           <button type="button" className="text-btn" onClick={() => setStepsOpen((open) => !open)}>
             {stepsOpen ? t(locale, 'play.hide') : t(locale, 'play.path')}
@@ -202,13 +225,13 @@ function Session({ skill, auto, startDifficulty }: { skill: Skill; auto: boolean
       <div className="row" style={{ marginTop: 14 }}>
         {offerUp ? (
           <>
-            <button type="button" className="primary warm" onClick={() => { const next = Math.min(5, difficulty + 1); setDifficulty(next); fresh(next, knobs) }}><Icon name="spark" /> {t(locale, 'play.harder')}</button>
+            <button type="button" className="primary warm" onClick={() => { const next = Math.min(5, difficulty + 1); const nextKnobs = defaultKnobs(skill, next); setDifficulty(next); setKnobs(nextKnobs); fresh(next, nextKnobs) }}><Icon name="spark" /> {t(locale, 'play.harder')}</button>
             <button type="button" className="ghost" onClick={() => fresh()}>{t(locale, 'play.stay')}</button>
           </>
         ) : result ? (
-          <button type="button" className="primary" onClick={() => fresh()}>{t(locale, 'play.next')} <Icon name="forward" /></button>
+          <button type="button" className="primary" data-ready="true" onClick={() => fresh()}>{t(locale, 'play.next')} <Icon name="forward" /></button>
         ) : (
-          <button type="button" className="primary" onClick={check}><Icon name="check" /> {t(locale, misses ? 'play.recheck' : 'play.check')}</button>
+          <button type="button" className="primary" data-ready={answer !== null} onClick={check}><Icon name="check" /> {t(locale, misses ? 'play.recheck' : 'play.check')}</button>
         )}
         <button type="button" className="ghost" onClick={leave}>{t(locale, 'play.done')}</button>
       </div>

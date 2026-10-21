@@ -1,25 +1,49 @@
 import { L } from '../lib/math'
-import type { DomainId, Knob, KnobOption, KnobValues, Localized, Skill } from '../lib/types'
+import type { DomainId, Knob, KnobOption, KnobValues, KnobWhen, Localized, Skill } from '../lib/types'
 
-const kind = L('Kind of problem', 'Art der Aufgabe', 'Tipo de problema')
+// One value per level, from 1 (warm-up) to 5 (spiral).
+type Levels<T> = [T, T, T, T, T]
 
-function range(
-  id: string,
-  label: Localized,
-  min: number,
-  max: number,
-  vals: [number, number, number, number, number],
-  step = 1,
-): Knob {
-  return { id, kind: 'range', label, min, max, step, byDifficulty: vals }
+const PROBLEM = L('Kind of problem', 'Art der Aufgabe', 'Tipo de problema')
+const PROBLEM_HINT = L('The kind of question this skill asks.', 'Die Art der Frage in dieser Fertigkeit.', 'El tipo de pregunta de esta destreza.')
+const DIGITS = L('Digits', 'Stellen', 'Cifras')
+const MAX_NUMBER = L('Largest number', 'Größte Zahl', 'Número mayor')
+const FACTOR_HINT = L('The biggest factor or group size in a problem.', 'Der größte Faktor oder die größte Gruppengröße.', 'El mayor factor o tamaño de grupo en un problema.')
+const MAX_HINT = L('The biggest number a question can use.', 'Die größte Zahl, die eine Aufgabe nutzt.', 'El número más grande que usa una pregunta.')
+const DEN_LABEL = L('Denominator up to', 'Nenner bis', 'Denominador hasta')
+const DEN_HINT = L('The biggest denominator the fractions can use.', 'Der größte Nenner, den die Brüche verwenden.', 'El mayor denominador que pueden usar las fracciones.')
+const SIMPLE_LABEL = L('Require simplest form', 'Kürzen verlangen', 'Exigir la forma simple')
+const SIMPLE_HINT = L('Answers must be reduced to lowest terms.', 'Antworten müssen vollständig gekürzt sein.', 'Las respuestas deben quedar en su mínima expresión.')
+
+// A variable is a setting a teacher or student can change. Each one lists its value at every level.
+function range(id: string, label: Localized, hint: Localized, min: number, max: number, levels: Levels<number>, step = 1, when?: KnobWhen): Knob {
+  return { id, kind: 'range', label, hint, min, max, step, byDifficulty: levels, ...(when ? { when } : {}) }
 }
 
-function toggle(id: string, label: Localized, vals: [boolean, boolean, boolean, boolean, boolean]): Knob {
-  return { id, kind: 'toggle', label, byDifficulty: vals }
+function toggle(id: string, label: Localized, hint: Localized, levels: Levels<boolean>, when?: KnobWhen): Knob {
+  return { id, kind: 'toggle', label, hint, byDifficulty: levels, ...(when ? { when } : {}) }
 }
 
-function select(options: KnobOption[], vals: [string, string, string, string, string]): Knob {
-  return { id: 'mode', kind: 'select', label: kind, options, byDifficulty: vals }
+function choose(id: string, label: Localized, hint: Localized, options: KnobOption[], levels: Levels<string>, when?: KnobWhen): Knob {
+  return { id, kind: 'select', label, hint, options, byDifficulty: levels, ...(when ? { when } : {}) }
+}
+
+// The problem-type row. Every skill has one under the id `mode`, which presets and shared links refer to.
+function mode(options: KnobOption[], levels: Levels<string>, label: Localized = PROBLEM, hint: Localized = PROBLEM_HINT): Knob {
+  return choose('mode', label, hint, options, levels)
+}
+
+function den(min: number, max: number, levels: Levels<number>, when?: KnobWhen): Knob {
+  return range('den', DEN_LABEL, DEN_HINT, min, max, levels, 1, when)
+}
+
+function simple(when?: KnobWhen): Knob {
+  return toggle('simple', SIMPLE_LABEL, SIMPLE_HINT, [false, false, true, true, true], when)
+}
+
+// Shows a variable only when another variable has one of these values.
+function showFor(id: string, ...values: string[]): KnobWhen {
+  return { id, in: values }
 }
 
 function opt(value: string, en: string, de: string, es: string): KnobOption {
@@ -29,15 +53,6 @@ function opt(value: string, en: string, de: string, es: string): KnobOption {
 function skill(partial: Omit<Skill, 'knobs'> & { knobs?: Knob[] }): Skill {
   return { knobs: [], ...partial }
 }
-
-const digits = range('digits', L('Digits', 'Stellen', 'Cifras'), 1, 4, [2, 2, 3, 3, 4])
-const simple = toggle('simple', L('Require simplest form', 'Kürzen verlangen', 'Exigir la forma simple'), [
-  false,
-  false,
-  true,
-  true,
-  true,
-])
 
 export const DOMAIN_COLOR: Record<DomainId, string> = {
   OA: '#3c4c9a',
@@ -62,11 +77,11 @@ export const SKILLS: Skill[] = [
     months: [10, 11, 6],
     prereq: [],
     knobs: [
-      select(
+      mode(
         [opt('mul', 'Multiply', 'Multiplizieren', 'Multiplicar'), opt('div', 'Divide', 'Dividieren', 'Dividir'), opt('mixed', 'Mixed', 'Gemischt', 'Mixto')],
         ['mul', 'mul', 'mixed', 'div', 'mixed'],
       ),
-      range('max', L('Largest factor', 'Größter Faktor', 'Mayor factor'), 2, 12, [5, 6, 9, 10, 12]),
+      range('max', L('Largest factor', 'Größter Faktor', 'Mayor factor'), FACTOR_HINT, 2, 12, [5, 6, 9, 10, 12]),
     ],
   }),
   skill({
@@ -79,7 +94,7 @@ export const SKILLS: Skill[] = [
     months: [10, 11],
     prereq: ['3.oa.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('comm', 'Commutative', 'Kommutativ', 'Conmutativa'),
           opt('missing', 'Missing factor', 'Fehlender Faktor', 'Factor faltante'),
@@ -87,6 +102,7 @@ export const SKILLS: Skill[] = [
         ],
         ['comm', 'missing', 'missing', 'dist', 'dist'],
       ),
+      range('max', L('Largest factor', 'Größter Faktor', 'Mayor factor'), FACTOR_HINT, 3, 12, [6, 7, 9, 10, 12]),
     ],
   }),
   skill({
@@ -99,11 +115,11 @@ export const SKILLS: Skill[] = [
     months: [10, 11, 12, 6],
     prereq: ['3.oa.a'],
     knobs: [
-      select(
+      mode(
         [opt('mul', 'Multiply', 'Multiplizieren', 'Multiplicar'), opt('div', 'Divide', 'Dividieren', 'Dividir'), opt('mixed', 'Mixed', 'Gemischt', 'Mixto')],
         ['mul', 'mul', 'mixed', 'mixed', 'div'],
       ),
-      range('max', L('Largest factor', 'Größter Faktor', 'Mayor factor'), 2, 12, [5, 7, 9, 10, 12]),
+      range('max', L('Largest factor', 'Größter Faktor', 'Mayor factor'), FACTOR_HINT, 2, 12, [5, 7, 9, 10, 12]),
     ],
   }),
   skill({
@@ -116,10 +132,11 @@ export const SKILLS: Skill[] = [
     months: [12, 1],
     prereq: ['3.oa.c'],
     knobs: [
-      select(
+      mode(
         [opt('twostep', 'Two-step story', 'Zweistufige Geschichte', 'Historia de dos pasos'), opt('pattern', 'Pattern', 'Muster', 'Patrón')],
         ['twostep', 'twostep', 'pattern', 'twostep', 'pattern'],
       ),
+      range('max', MAX_NUMBER, L('The biggest group size or count, and the largest pattern step.', 'Die größte Gruppengröße oder Anzahl und der größte Musterschritt.', 'El mayor tamaño de grupo o cantidad, y el mayor paso del patrón.'), 5, 12, [6, 7, 9, 10, 12]),
     ],
   }),
   skill({
@@ -132,7 +149,7 @@ export const SKILLS: Skill[] = [
     months: [9, 10, 6],
     prereq: [],
     knobs: [
-      select(
+      mode(
         [
           opt('add', 'Add', 'Addieren', 'Sumar'),
           opt('sub', 'Subtract', 'Subtrahieren', 'Restar'),
@@ -140,6 +157,16 @@ export const SKILLS: Skill[] = [
           opt('times10', 'Times 10, 20…', 'Mal 10, 20…', 'Por 10, 20…'),
         ],
         ['add', 'add', 'sub', 'round', 'times10'],
+      ),
+      range(
+        'within',
+        L('Numbers up to', 'Zahlen bis', 'Números hasta'),
+        L('The largest number in sums, differences, and rounding.', 'Die größte Zahl in Summen, Differenzen und beim Runden.', 'El mayor número en sumas, restas y redondeos.'),
+        100,
+        1000,
+        [300, 500, 1000, 1000, 1000],
+        100,
+        showFor('mode', 'add', 'sub', 'round'),
       ),
     ],
   }),
@@ -153,7 +180,7 @@ export const SKILLS: Skill[] = [
     months: [2, 3, 4, 6],
     prereq: [],
     knobs: [
-      select(
+      mode(
         [
           opt('shade', 'Shade', 'Färben', 'Sombrear'),
           opt('name', 'Name', 'Benennen', 'Nombrar'),
@@ -163,7 +190,7 @@ export const SKILLS: Skill[] = [
         ],
         ['shade', 'name', 'line', 'compare', 'equiv'],
       ),
-      range('den', L('Denominator up to', 'Nenner bis', 'Denominador hasta'), 2, 8, [4, 4, 6, 8, 8]),
+      den(2, 8, [4, 4, 6, 8, 8]),
     ],
   }),
   skill({
@@ -176,7 +203,7 @@ export const SKILLS: Skill[] = [
     months: [4, 5],
     prereq: [],
     knobs: [
-      select(
+      mode(
         [
           opt('read', 'Read a clock', 'Uhr lesen', 'Leer un reloj'),
           opt('set', 'Set a clock', 'Uhr stellen', 'Poner un reloj'),
@@ -184,6 +211,13 @@ export const SKILLS: Skill[] = [
           opt('mass', 'Estimate', 'Schätzen', 'Estimar'),
         ],
         ['read', 'set', 'read', 'elapsed', 'mass'],
+      ),
+      toggle(
+        'fives',
+        L('Five-minute marks only', 'Nur Fünf-Minuten-Marken', 'Solo marcas de cinco minutos'),
+        L('Clock hands rest on the five-minute marks.', 'Die Zeiger stehen auf den Fünf-Minuten-Marken.', 'Las manecillas caen en las marcas de cinco minutos.'),
+        [true, true, false, false, false],
+        showFor('mode', 'read', 'set', 'elapsed'),
       ),
     ],
   }),
@@ -197,7 +231,7 @@ export const SKILLS: Skill[] = [
     months: [4, 5, 6],
     prereq: [],
     knobs: [
-      select(
+      mode(
         [opt('read', 'Read', 'Lesen', 'Leer'), opt('build', 'Build', 'Bauen', 'Construir')],
         ['read', 'read', 'read', 'build', 'build'],
       ),
@@ -213,10 +247,11 @@ export const SKILLS: Skill[] = [
     months: [1, 2, 5],
     prereq: ['3.oa.c'],
     knobs: [
-      select(
+      mode(
         [opt('area', 'Find area', 'Fläche finden', 'Hallar el área'), opt('missing', 'Missing side', 'Fehlende Seite', 'Lado faltante')],
         ['area', 'area', 'area', 'missing', 'missing'],
       ),
+      range('max', L('Longest side', 'Längste Seite', 'Lado más largo'), L('The longest side a rectangle can have.', 'Die längste Seite eines Rechtecks.', 'El lado más largo que puede tener un rectángulo.'), 3, 12, [5, 6, 9, 10, 12]),
     ],
   }),
   skill({
@@ -229,10 +264,11 @@ export const SKILLS: Skill[] = [
     months: [1, 2],
     prereq: ['3.md.c'],
     knobs: [
-      select(
+      mode(
         [opt('peri', 'Find perimeter', 'Umfang finden', 'Hallar el perímetro'), opt('missing', 'Missing side', 'Fehlende Seite', 'Lado faltante')],
         ['peri', 'peri', 'peri', 'missing', 'missing'],
       ),
+      range('max', L('Longest side', 'Längste Seite', 'Lado más largo'), L('The longest side a rectangle can have.', 'Die längste Seite eines Rechtecks.', 'El lado más largo que puede tener un rectángulo.'), 6, 12, [8, 10, 12, 12, 12]),
     ],
   }),
   skill({
@@ -245,13 +281,20 @@ export const SKILLS: Skill[] = [
     months: [1, 3, 5],
     prereq: ['3.nf.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('name', 'Name', 'Benennen', 'Nombrar'),
           opt('partition', 'Equal parts', 'Gleiche Teile', 'Partes iguales'),
           opt('attribute', 'Attribute', 'Eigenschaft', 'Atributo'),
         ],
         ['name', 'name', 'partition', 'attribute', 'partition'],
+      ),
+      toggle(
+        'advanced',
+        L('Pentagons and hexagons', 'Fünfecke und Sechsecke', 'Pentágonos y hexágonos'),
+        L('Adds five- and six-sided shapes to the names.', 'Fügt Figuren mit fünf und sechs Seiten zu den Namen hinzu.', 'Añade figuras de cinco y seis lados a los nombres.'),
+        [false, false, true, true, true],
+        showFor('mode', 'name'),
       ),
     ],
   }),
@@ -265,11 +308,15 @@ export const SKILLS: Skill[] = [
     months: [10, 11, 6],
     prereq: ['3.oa.d'],
     knobs: [
-      select(
+      choose(
+        'mode',
+        L('Number of steps', 'Anzahl der Schritte', 'Cantidad de pasos'),
+        L('Two-step or three-step stories.', 'Geschichten mit zwei oder drei Schritten.', 'Historias de dos o tres pasos.'),
         [opt('two', 'Two steps', 'Zwei Schritte', 'Dos pasos'), opt('three', 'Three steps', 'Drei Schritte', 'Tres pasos')],
         ['two', 'two', 'two', 'three', 'three'],
       ),
-      toggle('remain', L('Include a remainder', 'Mit Rest', 'Con residuo'), [false, false, true, true, true]),
+      range('max', L('Items per box, up to', 'Stücke pro Kiste, höchstens', 'Objetos por caja, como máximo'), L('The most items that fit in one box or tray.', 'Die größte Anzahl an Stücken in einer Kiste.', 'La mayor cantidad de objetos en una caja o bandeja.'), 6, 20, [10, 12, 15, 15, 20]),
+      toggle('remain', L('Include a remainder', 'Mit Rest', 'Con residuo'), L('Some items are left over at the end.', 'Am Ende bleiben einige Stücke übrig.', 'Al final sobran algunos objetos.'), [false, false, true, true, true]),
     ],
   }),
   skill({
@@ -282,7 +329,7 @@ export const SKILLS: Skill[] = [
     months: [9, 11, 6],
     prereq: ['3.oa.c'],
     knobs: [
-      select(
+      mode(
         [
           opt('factor', 'Choose a factor', 'Faktor wählen', 'Elegir un factor'),
           opt('multiple', 'Choose a multiple', 'Vielfaches wählen', 'Elegir un múltiplo'),
@@ -291,6 +338,7 @@ export const SKILLS: Skill[] = [
         ],
         ['factor', 'multiple', 'gcf', 'lcm', 'gcf'],
       ),
+      range('max', MAX_NUMBER, MAX_HINT, 10, 40, [12, 16, 20, 24, 30]),
     ],
   }),
   skill({
@@ -303,10 +351,11 @@ export const SKILLS: Skill[] = [
     months: [12, 1],
     prereq: ['3.oa.d'],
     knobs: [
-      select(
+      mode(
         [opt('next', 'Next terms', 'Nächste Glieder', 'Siguientes términos'), opt('rule', 'Name the rule', 'Regel benennen', 'Nombrar la regla')],
         ['next', 'next', 'rule', 'next', 'rule'],
       ),
+      range('jump', L('Biggest jump', 'Größter Sprung', 'Salto mayor'), L('The largest amount a pattern adds or takes away.', 'Der größte Betrag, den ein Muster addiert oder abzieht.', 'La mayor cantidad que un patrón suma o resta.'), 3, 12, [5, 8, 12, 12, 12]),
     ],
   }),
   skill({
@@ -319,7 +368,7 @@ export const SKILLS: Skill[] = [
     months: [9, 10],
     prereq: ['3.nbt.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('value', 'Digit value', 'Ziffernwert', 'Valor de la cifra'),
           opt('round', 'Round', 'Runden', 'Redondear'),
@@ -328,6 +377,7 @@ export const SKILLS: Skill[] = [
         ],
         ['value', 'round', 'build', 'times', 'times'],
       ),
+      range('digits', DIGITS, L('How many places the number has.', 'Wie viele Stellen die Zahl hat.', 'Cuántos lugares tiene el número.'), 4, 6, [4, 5, 5, 5, 6]),
     ],
   }),
   skill({
@@ -340,7 +390,7 @@ export const SKILLS: Skill[] = [
     months: [9, 10, 11, 6],
     prereq: ['4.nbt.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('add', 'Add', 'Addieren', 'Sumar'),
           opt('sub', 'Subtract', 'Subtrahieren', 'Restar'),
@@ -349,8 +399,14 @@ export const SKILLS: Skill[] = [
         ],
         ['add', 'sub', 'mul', 'div', 'mul'],
       ),
-      digits,
-      toggle('remain', L('Remainders in division', 'Reste bei der Division', 'Residuos en la división'), [false, false, true, true, true]),
+      range('digits', DIGITS, L('How many digits each number has.', 'Wie viele Stellen jede Zahl hat.', 'Cuántas cifras tiene cada número.'), 2, 4, [2, 2, 3, 3, 4]),
+      toggle(
+        'remain',
+        L('Remainders in division', 'Reste bei der Division', 'Residuos en la división'),
+        L('Some divisions leave a number over.', 'Manche Divisionen lassen einen Rest.', 'Algunas divisiones dejan un residuo.'),
+        [false, false, true, true, true],
+        showFor('mode', 'div'),
+      ),
     ],
   }),
   skill({
@@ -362,14 +418,18 @@ export const SKILLS: Skill[] = [
     blurb: L('Rewrite a fraction, compare two, or sort three.', 'Einen Bruch umschreiben, zwei vergleichen oder drei sortieren.', 'Reescribir una fracción, comparar dos u ordenar tres.'),
     months: [1, 2],
     prereq: ['3.nf.a'],
-    knobs: [select(
-      [
-        opt('equiv', 'Equivalent', 'Gleichwertig', 'Equivalente'),
-        opt('compare', 'Compare', 'Vergleichen', 'Comparar'),
-        opt('order', 'Order', 'Ordnen', 'Ordenar'),
-      ],
-      ['equiv', 'equiv', 'compare', 'order', 'compare'],
-    ), simple],
+    knobs: [
+      mode(
+        [
+          opt('equiv', 'Equivalent', 'Gleichwertig', 'Equivalente'),
+          opt('compare', 'Compare', 'Vergleichen', 'Comparar'),
+          opt('order', 'Order', 'Ordnen', 'Ordenar'),
+        ],
+        ['equiv', 'equiv', 'compare', 'order', 'compare'],
+      ),
+      den(4, 12, [4, 4, 6, 8, 10]),
+      simple(showFor('mode', 'equiv')),
+    ],
   }),
   skill({
     id: '4.nf.b',
@@ -381,7 +441,7 @@ export const SKILLS: Skill[] = [
     months: [2, 3, 6],
     prereq: ['4.nf.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('add', 'Add', 'Addieren', 'Sumar'),
           opt('sub', 'Subtract', 'Subtrahieren', 'Restar'),
@@ -390,7 +450,8 @@ export const SKILLS: Skill[] = [
         ],
         ['add', 'add', 'sub', 'mixed', 'mulwhole'],
       ),
-      simple,
+      den(3, 12, [6, 8, 10, 10, 12]),
+      simple(),
     ],
   }),
   skill({
@@ -403,13 +464,19 @@ export const SKILLS: Skill[] = [
     months: [3, 4, 6],
     prereq: ['4.nf.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('write', 'Write the decimal', 'Dezimalzahl schreiben', 'Escribir el decimal'),
           opt('compare', 'Compare', 'Vergleichen', 'Comparar'),
           opt('shade', 'Shade', 'Färben', 'Sombrear'),
         ],
         ['write', 'write', 'compare', 'shade', 'compare'],
+      ),
+      toggle(
+        'hundredths',
+        L('Hundredths', 'Hundertstel', 'Centésimos'),
+        L('Use a 10 by 10 grid for hundredths.', 'Für Hundertstel ein 10-mal-10-Gitter nutzen.', 'Usa una cuadrícula de 10 por 10 para centésimos.'),
+        [false, false, true, true, true],
       ),
     ],
   }),
@@ -423,7 +490,7 @@ export const SKILLS: Skill[] = [
     months: [4, 5, 6],
     prereq: ['4.nbt.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('metric', 'Metric', 'Metrisch', 'Métrico'),
           opt('time', 'Time', 'Zeit', 'Tiempo'),
@@ -431,6 +498,7 @@ export const SKILLS: Skill[] = [
         ],
         ['metric', 'metric', 'time', 'custom', 'metric'],
       ),
+      range('max', L('Largest amount', 'Größte Menge', 'Cantidad mayor'), L('The biggest count of units a question can use.', 'Die größte Anzahl an Einheiten in einer Aufgabe.', 'La mayor cantidad de unidades que usa una pregunta.'), 3, 20, [6, 8, 8, 10, 12]),
     ],
   }),
   skill({
@@ -443,7 +511,7 @@ export const SKILLS: Skill[] = [
     months: [4, 5],
     prereq: ['3.md.b'],
     knobs: [
-      select(
+      mode(
         [opt('count', 'How many', 'Wie viele', 'Cuántos'), opt('sum', 'Total', 'Summe', 'Total')],
         ['count', 'count', 'sum', 'count', 'sum'],
       ),
@@ -459,7 +527,7 @@ export const SKILLS: Skill[] = [
     months: [5, 6],
     prereq: [],
     knobs: [
-      select(
+      mode(
         [
           opt('classify', 'Classify', 'Einteilen', 'Clasificar'),
           opt('read', 'Read protractor', 'Winkelmesser lesen', 'Leer el transportador'),
@@ -480,13 +548,20 @@ export const SKILLS: Skill[] = [
     months: [5, 6],
     prereq: ['3.g.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('symmetry', 'Lines of symmetry', 'Symmetrieachsen', 'Ejes de simetría'),
           opt('classify', 'Right angles', 'Rechte Winkel', 'Ángulos rectos'),
           opt('parallel', 'Parallel sides', 'Parallele Seiten', 'Lados paralelos'),
         ],
         ['symmetry', 'symmetry', 'classify', 'parallel', 'symmetry'],
+      ),
+      toggle(
+        'allShapes',
+        L('All shapes', 'Alle Figuren', 'Todas las figuras'),
+        L('Adds pentagons, rhombuses, trapezoids, and more.', 'Fügt Fünfecke, Rauten, Trapeze und mehr hinzu.', 'Añade pentágonos, rombos, trapecios y más.'),
+        [false, false, true, true, true],
+        showFor('mode', 'symmetry'),
       ),
     ],
   }),
@@ -500,10 +575,11 @@ export const SKILLS: Skill[] = [
     months: [9, 11, 6],
     prereq: ['4.oa.a'],
     knobs: [
-      select(
+      mode(
         [opt('eval', 'Evaluate', 'Ausrechnen', 'Calcular'), opt('words', 'Match the words', 'Worte zuordnen', 'Emparejar palabras')],
         ['eval', 'eval', 'words', 'eval', 'words'],
       ),
+      range('max', MAX_NUMBER, L('The biggest number inside an expression.', 'Die größte Zahl in einem Term.', 'El mayor número dentro de una expresión.'), 6, 12, [6, 7, 9, 10, 12]),
     ],
   }),
   skill({
@@ -515,7 +591,13 @@ export const SKILLS: Skill[] = [
     blurb: L('When one pattern reaches a term, find the partner pattern.', 'Wenn ein Muster ein Glied erreicht, das Partner-Muster finden.', 'Cuando un patrón llega a un término, hallar el patrón compañero.'),
     months: [11, 12],
     prereq: ['4.oa.c'],
-    knobs: [select([opt('ask', 'Corresponding term', 'Zugehöriges Glied', 'Término correspondiente')], ['ask', 'ask', 'ask', 'ask', 'ask'])],
+    knobs: [
+      mode(
+        [opt('ask', 'Corresponding term', 'Zugehöriges Glied', 'Término correspondiente')],
+        ['ask', 'ask', 'ask', 'ask', 'ask'],
+      ),
+      range('max', L('Largest first step', 'Größter erster Schritt', 'Primer paso mayor'), L('The biggest step in the first pattern.', 'Der größte Schritt im ersten Muster.', 'El mayor paso del primer patrón.'), 2, 10, [4, 5, 6, 8, 10]),
+    ],
   }),
   skill({
     id: '5.nbt.a',
@@ -527,7 +609,7 @@ export const SKILLS: Skill[] = [
     months: [9, 10],
     prereq: ['4.nf.c', '4.nbt.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('compare', 'Compare', 'Vergleichen', 'Comparar'),
           opt('round', 'Round', 'Runden', 'Redondear'),
@@ -535,6 +617,16 @@ export const SKILLS: Skill[] = [
           opt('expand', 'Expanded form', 'Erweiterte Form', 'Forma desarrollada'),
         ],
         ['compare', 'round', 'times', 'expand', 'times'],
+      ),
+      range(
+        'decimals',
+        L('Decimal places', 'Dezimalstellen', 'Cifras decimales'),
+        L('Digits after the point in the numbers compared.', 'Stellen nach dem Komma in den verglichenen Zahlen.', 'Cifras después del punto en los números comparados.'),
+        1,
+        3,
+        [1, 2, 2, 2, 3],
+        1,
+        showFor('mode', 'compare'),
       ),
     ],
   }),
@@ -548,7 +640,7 @@ export const SKILLS: Skill[] = [
     months: [9, 10, 11, 6],
     prereq: ['5.nbt.a', '4.nbt.b'],
     knobs: [
-      select(
+      mode(
         [
           opt('mul', 'Multiply wholes', 'Ganze Zahlen mal', 'Multiplicar enteros'),
           opt('div', 'Divide wholes', 'Ganze Zahlen geteilt', 'Dividir enteros'),
@@ -559,6 +651,7 @@ export const SKILLS: Skill[] = [
         ],
         ['adddec', 'mul', 'muldec', 'div', 'divdec'],
       ),
+      range('digits', DIGITS, L('Digits in each whole number.', 'Stellen jeder ganzen Zahl.', 'Cifras de cada entero.'), 2, 4, [2, 2, 3, 3, 4], 1, showFor('mode', 'mul', 'div')),
     ],
   }),
   skill({
@@ -571,7 +664,7 @@ export const SKILLS: Skill[] = [
     months: [1, 2, 6],
     prereq: ['4.nf.b'],
     knobs: [
-      select(
+      mode(
         [
           opt('add', 'Add', 'Addieren', 'Sumar'),
           opt('sub', 'Subtract', 'Subtrahieren', 'Restar'),
@@ -579,7 +672,8 @@ export const SKILLS: Skill[] = [
         ],
         ['add', 'add', 'sub', 'mixed', 'sub'],
       ),
-      simple,
+      den(4, 12, [6, 6, 8, 8, 10]),
+      simple(),
     ],
   }),
   skill({
@@ -592,7 +686,7 @@ export const SKILLS: Skill[] = [
     months: [3, 4, 6],
     prereq: ['5.nf.a', '4.nf.b'],
     knobs: [
-      select(
+      mode(
         [
           opt('mul', 'Multiply fractions', 'Brüche mal', 'Multiplicar fracciones'),
           opt('mulwhole', 'Fraction of a whole', 'Bruch von einer Ganzen', 'Fracción de un entero'),
@@ -601,7 +695,8 @@ export const SKILLS: Skill[] = [
         ],
         ['mulwhole', 'mul', 'divunit', 'divwhole', 'mul'],
       ),
-      simple,
+      den(6, 12, [6, 6, 8, 8, 10]),
+      simple(),
     ],
   }),
   skill({
@@ -614,7 +709,7 @@ export const SKILLS: Skill[] = [
     months: [1, 2],
     prereq: ['4.md.a'],
     knobs: [
-      select(
+      mode(
         [opt('metric', 'Single unit', 'Eine Einheit', 'Una unidad'), opt('compound', 'Compound', 'Zusammengesetzt', 'Compuesta')],
         ['metric', 'metric', 'compound', 'metric', 'compound'],
       ),
@@ -630,7 +725,7 @@ export const SKILLS: Skill[] = [
     months: [4, 5],
     prereq: ['4.md.b', '4.nf.b'],
     knobs: [
-      select(
+      mode(
         [opt('count', 'How many', 'Wie viele', 'Cuántos'), opt('greater', 'Greater than', 'Größer als', 'Mayor que')],
         ['count', 'count', 'greater', 'count', 'greater'],
       ),
@@ -646,7 +741,7 @@ export const SKILLS: Skill[] = [
     months: [3, 5, 6],
     prereq: ['3.md.c', '5.nbt.b'],
     knobs: [
-      select(
+      mode(
         [
           opt('volume', 'Find volume', 'Volumen finden', 'Hallar el volumen'),
           opt('missing', 'Missing edge', 'Fehlende Kante', 'Arista faltante'),
@@ -654,6 +749,7 @@ export const SKILLS: Skill[] = [
         ],
         ['layers', 'volume', 'volume', 'missing', 'volume'],
       ),
+      range('max', L('Largest edge', 'Größte Kante', 'Arista mayor'), L('The longest edge of a box.', 'Die längste Kante eines Quaders.', 'La arista más larga de una caja.'), 5, 10, [5, 6, 8, 9, 10]),
     ],
   }),
   skill({
@@ -666,13 +762,20 @@ export const SKILLS: Skill[] = [
     months: [3, 5, 6],
     prereq: [],
     knobs: [
-      select(
+      mode(
         [
           opt('plot', 'Plot', 'Setzen', 'Marcar'),
           opt('read', 'Read', 'Ablesen', 'Leer'),
           opt('distance', 'Distance', 'Abstand', 'Distancia'),
         ],
         ['plot', 'plot', 'read', 'distance', 'plot'],
+      ),
+      range('max', L('Largest coordinate', 'Größte Koordinate', 'Coordenada mayor'), L('The biggest coordinate on the grid.', 'Die größte Koordinate im Gitter.', 'La mayor coordenada en la cuadrícula.'), 4, 12, [6, 8, 8, 10, 12]),
+      toggle(
+        'quadrants',
+        L('All four quadrants', 'Alle vier Quadranten', 'Los cuatro cuadrantes'),
+        L('Points can sit left of zero or below it.', 'Punkte dürfen links von null oder unter null liegen.', 'Los puntos pueden quedar a la izquierda del cero o debajo.'),
+        [false, false, false, false, false],
       ),
     ],
   }),
@@ -686,7 +789,7 @@ export const SKILLS: Skill[] = [
     months: [5, 6],
     prereq: ['4.g.a'],
     knobs: [
-      select(
+      mode(
         [opt('statement', 'Which is true', 'Was stimmt', 'Cuál es cierta'), opt('figure', 'Which figure', 'Welche Figur', 'Cuál figura')],
         ['statement', 'statement', 'figure', 'statement', 'figure'],
       ),
@@ -702,7 +805,7 @@ export const SKILLS: Skill[] = [
     months: [9, 10, 11, 6],
     prereq: ['5.nf.b'],
     knobs: [
-      select(
+      mode(
         [
           opt('build', 'Build a ratio', 'Verhältnis bauen', 'Armar una razón'),
           opt('missing', 'Missing term', 'Fehlendes Glied', 'Término faltante'),
@@ -711,6 +814,7 @@ export const SKILLS: Skill[] = [
         ],
         ['build', 'missing', 'unit', 'percent', 'missing'],
       ),
+      range('max', L('Largest ratio term', 'Größtes Verhältnisglied', 'Término mayor de la razón'), L('The biggest number in a ratio.', 'Die größte Zahl in einem Verhältnis.', 'El mayor número de una razón.'), 4, 12, [4, 6, 8, 10, 12], 1, showFor('mode', 'build', 'missing')),
     ],
   }),
   skill({
@@ -723,7 +827,7 @@ export const SKILLS: Skill[] = [
     months: [11, 12, 6],
     prereq: ['5.nf.b'],
     knobs: [
-      select(
+      mode(
         [
           opt('frac', 'Fraction ÷ fraction', 'Bruch ÷ Bruch', 'Fracción ÷ fracción'),
           opt('whole', 'Whole ÷ fraction', 'Ganze ÷ Bruch', 'Entero ÷ fracción'),
@@ -731,7 +835,8 @@ export const SKILLS: Skill[] = [
         ],
         ['whole', 'frac', 'frac', 'word', 'frac'],
       ),
-      simple,
+      den(4, 12, [6, 6, 8, 8, 10], showFor('mode', 'frac', 'whole')),
+      simple(showFor('mode', 'frac', 'whole')),
     ],
   }),
   skill({
@@ -744,7 +849,7 @@ export const SKILLS: Skill[] = [
     months: [9, 11],
     prereq: ['4.oa.b', '5.nbt.b'],
     knobs: [
-      select(
+      mode(
         [
           opt('gcf', 'GCF', 'ggT', 'MCD'),
           opt('lcm', 'LCM', 'kgV', 'mcm'),
@@ -753,6 +858,7 @@ export const SKILLS: Skill[] = [
         ],
         ['gcf', 'lcm', 'mul', 'div', 'gcf'],
       ),
+      range('max', MAX_NUMBER, L('The biggest number used for GCF or LCM.', 'Die größte Zahl für ggT oder kgV.', 'El mayor número para el MCD o el mcm.'), 12, 60, [24, 30, 36, 40, 48], 1, showFor('mode', 'gcf', 'lcm')),
     ],
   }),
   skill({
@@ -765,7 +871,7 @@ export const SKILLS: Skill[] = [
     months: [1, 2, 6],
     prereq: ['5.g.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('compare', 'Compare', 'Vergleichen', 'Comparar'),
           opt('order', 'Order', 'Ordnen', 'Ordenar'),
@@ -773,6 +879,16 @@ export const SKILLS: Skill[] = [
           opt('abs', 'Absolute value', 'Betrag', 'Valor absoluto'),
         ],
         ['abs', 'compare', 'order', 'plot', 'plot'],
+      ),
+      range(
+        'span',
+        L('Largest distance from zero', 'Größter Abstand von null', 'Distancia máxima desde cero'),
+        L('The biggest absolute value a number can have.', 'Der größte Betrag, den eine Zahl haben kann.', 'El mayor valor absoluto que puede tener un número.'),
+        3,
+        12,
+        [3, 4, 5, 6, 8],
+        1,
+        showFor('mode', 'abs', 'compare', 'plot'),
       ),
     ],
   }),
@@ -786,7 +902,7 @@ export const SKILLS: Skill[] = [
     months: [11, 3],
     prereq: ['5.oa.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('eval', 'Evaluate', 'Einsetzen', 'Evaluar'),
           opt('write', 'Match words', 'Worte zuordnen', 'Emparejar palabras'),
@@ -806,7 +922,7 @@ export const SKILLS: Skill[] = [
     months: [1, 3, 4, 6],
     prereq: ['6.ee.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('one', 'One step', 'Ein Schritt', 'Un paso'),
           opt('two', 'Two steps', 'Zwei Schritte', 'Dos pasos'),
@@ -814,6 +930,7 @@ export const SKILLS: Skill[] = [
         ],
         ['one', 'one', 'two', 'ineq', 'two'],
       ),
+      range('max', MAX_NUMBER, L('The biggest number in an equation.', 'Die größte Zahl in einer Gleichung.', 'El mayor número en una ecuación.'), 5, 12, [6, 8, 9, 10, 12]),
     ],
   }),
   skill({
@@ -826,10 +943,11 @@ export const SKILLS: Skill[] = [
     months: [3, 4],
     prereq: ['6.ee.b'],
     knobs: [
-      select(
+      mode(
         [opt('y', 'Find y', 'y finden', 'Hallar y'), opt('pair', 'Which pair', 'Welches Paar', 'Cuál par')],
         ['y', 'y', 'pair', 'y', 'pair'],
       ),
+      range('slope', L('Largest slope', 'Größte Steigung', 'Pendiente mayor'), L('The biggest multiplier m in y = mx + b.', 'Der größte Faktor m in y = mx + b.', 'El mayor multiplicador m en y = mx + b.'), 2, 9, [3, 4, 5, 6, 7]),
     ],
   }),
   skill({
@@ -842,7 +960,7 @@ export const SKILLS: Skill[] = [
     months: [5, 6],
     prereq: ['5.md.c'],
     knobs: [
-      select(
+      mode(
         [
           opt('triangle', 'Triangle area', 'Dreiecksfläche', 'Área del triángulo'),
           opt('para', 'Parallelogram', 'Parallelogramm', 'Paralelogramo'),
@@ -851,6 +969,7 @@ export const SKILLS: Skill[] = [
         ],
         ['triangle', 'para', 'volume', 'surface', 'triangle'],
       ),
+      range('max', L('Largest measure', 'Größtes Maß', 'Medida mayor'), L('The biggest base, height, or edge.', 'Die größte Grundlinie, Höhe oder Kante.', 'La mayor base, altura o arista.'), 9, 14, [9, 10, 12, 12, 14]),
     ],
   }),
   skill({
@@ -863,7 +982,7 @@ export const SKILLS: Skill[] = [
     months: [5],
     prereq: [],
     knobs: [
-      select(
+      mode(
         [opt('question', 'Statistical question', 'Statistische Frage', 'Pregunta estadística'), opt('spread', 'Which varies more', 'Was streut mehr', 'Cuál varía más')],
         ['question', 'question', 'spread', 'question', 'spread'],
       ),
@@ -879,7 +998,7 @@ export const SKILLS: Skill[] = [
     months: [5, 6],
     prereq: ['6.sp.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('mean', 'Mean', 'Mittelwert', 'Media'),
           opt('median', 'Median', 'Median', 'Mediana'),
@@ -887,6 +1006,7 @@ export const SKILLS: Skill[] = [
         ],
         ['mean', 'median', 'range', 'mean', 'median'],
       ),
+      range('size', L('How many numbers', 'Wie viele Zahlen', 'Cuántos números'), L('How many values each data set has.', 'Wie viele Werte jede Datenmenge hat.', 'Cuántos valores tiene cada conjunto de datos.'), 3, 9, [3, 5, 5, 7, 9], 2),
     ],
   }),
   skill({
@@ -899,7 +1019,7 @@ export const SKILLS: Skill[] = [
     months: [9, 10, 1, 6],
     prereq: ['6.rp.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('proportion', 'Proportion', 'Proportion', 'Proporción'),
           opt('percent', 'Percent of', 'Prozent von', 'Porcentaje de'),
@@ -920,7 +1040,7 @@ export const SKILLS: Skill[] = [
     months: [9, 11, 6],
     prereq: ['6.ns.c', '6.ns.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('add', 'Add', 'Addieren', 'Sumar'),
           opt('sub', 'Subtract', 'Subtrahieren', 'Restar'),
@@ -929,10 +1049,15 @@ export const SKILLS: Skill[] = [
         ],
         ['add', 'sub', 'mul', 'div', 'mul'],
       ),
-      select(
+      choose(
+        'family',
+        L('Numbers', 'Zahlen', 'Números'),
+        L('Whole numbers with negatives, or fractions.', 'Ganze Zahlen mit negativen Zahlen, oder Brüche.', 'Enteros con negativos, o fracciones.'),
         [opt('int', 'Integers', 'Ganze Zahlen', 'Enteros'), opt('frac', 'Fractions', 'Brüche', 'Fracciones')],
         ['int', 'int', 'int', 'frac', 'frac'],
-      ) && { ...select([opt('int', 'Integers', 'Ganze Zahlen', 'Enteros'), opt('frac', 'Fractions', 'Brüche', 'Fracciones')], ['int', 'int', 'int', 'frac', 'frac']), id: 'family' },
+      ),
+      range('max', L('Largest integer', 'Größte ganze Zahl', 'Entero mayor'), L('The biggest absolute value the integers can reach.', 'Der größte Betrag, den die ganzen Zahlen erreichen.', 'El mayor valor absoluto que pueden alcanzar los enteros.'), 5, 20, [9, 10, 12, 12, 15], 1, showFor('family', 'int')),
+      simple(showFor('family', 'frac')),
     ],
   }),
   skill({
@@ -945,10 +1070,11 @@ export const SKILLS: Skill[] = [
     months: [9, 1],
     prereq: ['6.ee.a'],
     knobs: [
-      select(
+      mode(
         [opt('expand', 'Expand', 'Ausmultiplizieren', 'Desarrollar'), opt('factor', 'Factor', 'Faktorisieren', 'Factorizar')],
         ['expand', 'expand', 'factor', 'expand', 'factor'],
       ),
+      range('max', L('Largest coefficient', 'Größter Koeffizient', 'Coeficiente mayor'), L('The biggest number inside a linear expression.', 'Die größte Zahl in einem linearen Term.', 'El mayor número dentro de una expresión lineal.'), 4, 12, [5, 6, 8, 9, 10]),
     ],
   }),
   skill({
@@ -961,7 +1087,7 @@ export const SKILLS: Skill[] = [
     months: [11, 1, 6],
     prereq: ['7.ee.a', '6.ee.b'],
     knobs: [
-      select(
+      mode(
         [
           opt('two', 'Two steps', 'Zwei Schritte', 'Dos pasos'),
           opt('dist', 'With parentheses', 'Mit Klammern', 'Con paréntesis'),
@@ -969,6 +1095,7 @@ export const SKILLS: Skill[] = [
         ],
         ['two', 'two', 'dist', 'ineq', 'dist'],
       ),
+      range('max', MAX_NUMBER, L('The biggest number in a two-step equation.', 'Die größte Zahl in einer Zweischritt-Gleichung.', 'El mayor número en una ecuación de dos pasos.'), 5, 12, [6, 8, 9, 10, 12], 1, showFor('mode', 'two')),
     ],
   }),
   skill({
@@ -981,7 +1108,7 @@ export const SKILLS: Skill[] = [
     months: [3, 6],
     prereq: ['6.rp.a', '6.g.a'],
     knobs: [
-      select(
+      mode(
         [
           opt('scale', 'Scale up', 'Vergrößern', 'Ampliar'),
           opt('down', 'Scale down', 'Verkleinern', 'Reducir'),
@@ -989,6 +1116,7 @@ export const SKILLS: Skill[] = [
         ],
         ['scale', 'scale', 'down', 'area', 'area'],
       ),
+      range('factor', L('Largest scale factor', 'Größter Maßstabsfaktor', 'Factor de escala mayor'), L('The biggest multiplier used when scaling.', 'Der größte Faktor beim Maßstab.', 'El mayor factor al escalar.'), 2, 9, [3, 4, 5, 6, 7]),
     ],
   }),
   skill({
@@ -1001,7 +1129,7 @@ export const SKILLS: Skill[] = [
     months: [3, 4],
     prereq: ['6.g.a', '4.md.c'],
     knobs: [
-      select(
+      mode(
         [
           opt('circ', 'Circumference', 'Umfang', 'Circunferencia'),
           opt('area', 'Circle area', 'Kreisfläche', 'Área del círculo'),
@@ -1011,6 +1139,7 @@ export const SKILLS: Skill[] = [
         ],
         ['circ', 'area', 'complement', 'triangle', 'surface'],
       ),
+      range('radius', L('Largest radius', 'Größter Radius', 'Radio mayor'), L('The biggest radius in a circle question.', 'Der größte Radius in einer Kreisaufgabe.', 'El mayor radio en una pregunta de círculos.'), 2, 12, [6, 8, 10, 10, 12], 1, showFor('mode', 'circ', 'area')),
     ],
   }),
   skill({
@@ -1022,7 +1151,9 @@ export const SKILLS: Skill[] = [
     blurb: L('Choose the sample that can actually speak for the population.', 'Die Stichprobe wählen, die wirklich für die Gesamtheit sprechen kann.', 'Elegir la muestra que de verdad puede hablar por la población.'),
     months: [5],
     prereq: ['6.sp.a'],
-    knobs: [select([opt('sample', 'Which sample', 'Welche Stichprobe', 'Cuál muestra')], ['sample', 'sample', 'sample', 'sample', 'sample'])],
+    knobs: [
+      mode([opt('sample', 'Which sample', 'Welche Stichprobe', 'Cuál muestra')], ['sample', 'sample', 'sample', 'sample', 'sample']),
+    ],
   }),
   skill({
     id: '7.sp.b',
@@ -1033,7 +1164,9 @@ export const SKILLS: Skill[] = [
     blurb: L('Two short lists, and a judgment about their means.', 'Zwei kurze Listen und ein Urteil über ihre Mittelwerte.', 'Dos listas cortas y un juicio sobre sus medias.'),
     months: [5],
     prereq: ['6.sp.b'],
-    knobs: [select([opt('mean', 'Which mean is greater', 'Welcher Mittelwert ist größer', 'Cuál media es mayor')], ['mean', 'mean', 'mean', 'mean', 'mean'])],
+    knobs: [
+      mode([opt('mean', 'Which mean is greater', 'Welcher Mittelwert ist größer', 'Cuál media es mayor')], ['mean', 'mean', 'mean', 'mean', 'mean']),
+    ],
   }),
   skill({
     id: '7.sp.c',
@@ -1045,7 +1178,7 @@ export const SKILLS: Skill[] = [
     months: [5, 6],
     prereq: ['5.nf.b'],
     knobs: [
-      select(
+      mode(
         [
           opt('simple', 'Simple', 'Einfach', 'Simple'),
           opt('complement', 'Complement', 'Gegenereignis', 'Complemento'),
@@ -1053,16 +1186,10 @@ export const SKILLS: Skill[] = [
         ],
         ['simple', 'simple', 'complement', 'compound', 'simple'],
       ),
-      simple,
+      simple(),
     ],
   }),
 ]
-
-const broken = SKILLS.find((item) => item.knobs.some((knob) => knob.kind === 'select' && knob.id !== 'mode' && item.id === '7.ns.a'))
-if (broken) {
-  const family = broken.knobs[1]
-  if (family && family.kind === 'select') family.id = 'family'
-}
 
 export function getSkill(id: string) {
   return SKILLS.find((item) => item.id === id)
