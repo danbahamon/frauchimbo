@@ -3,7 +3,7 @@ import type { Answer, Locale, Response } from '../lib/types'
 import { PALETTE } from '../lib/types'
 import { decimalKey, t, tx } from '../lib/i18n'
 import { MathText } from './MathText'
-import { ClockFace, ShapeFig } from './visuals'
+import { ClockFace, PlaneGrid, ShapeFig, planeMap } from './visuals'
 
 function useKeys(onKey: (key: string) => void, enabled: boolean) {
   useEffect(() => {
@@ -51,7 +51,7 @@ function parseNumeric(text: string) {
   return Number.isFinite(value) ? value : null
 }
 
-export function AnswerWidget({ response, locale, onChange, initial, locked = false }: { response: Response; locale: Locale; onChange: (answer: Answer | null) => void; initial?: Answer | null; locked?: boolean }) {
+export function AnswerWidget({ response, locale, onChange, initial, locked = false, reveal }: { response: Response; locale: Locale; onChange: (answer: Answer | null) => void; initial?: Answer | null; locked?: boolean; reveal?: Answer | null }) {
   let body: ReactNode = null
   if (response.type === 'number') body = <NumberWidget response={response} locale={locale} onChange={onChange} initial={initial?.kind === 'number' ? initial.value : null} />
   else if (response.type === 'fraction') body = <FractionWidget response={response} locale={locale} onChange={onChange} initial={initial?.kind === 'fraction' ? initial : null} />
@@ -59,7 +59,7 @@ export function AnswerWidget({ response, locale, onChange, initial, locked = fal
   else if (response.type === 'compare') body = <CompareWidget response={response} locale={locale} onChange={onChange} initial={initial?.kind === 'compare' ? initial.sign : null} />
   else if (response.type === 'order') body = <OrderWidget response={response} locale={locale} onChange={onChange} initial={initial?.kind === 'order' ? initial.ids : null} />
   else if (response.type === 'numberline') body = <LineWidget response={response} onChange={onChange} initial={initial?.kind === 'number' ? initial.value : null} />
-  else if (response.type === 'coordinate') body = <PlaneWidget response={response} onChange={onChange} initial={initial?.kind === 'points' ? initial.points[0] ?? null : null} />
+  else if (response.type === 'coordinate') body = <PlaneWidget response={response} locale={locale} onChange={onChange} initial={initial?.kind === 'points' ? initial.points[0] ?? null : null} reveal={reveal?.kind === 'points' && locked ? reveal.points : undefined} />
   else if (response.type === 'shade') body = <ShadeWidget response={response} locale={locale} onChange={onChange} initial={initial?.kind === 'shade' ? initial.count : 0} />
   else if (response.type === 'clock') body = <ClockWidget onChange={onChange} locale={locale} initial={initial?.kind === 'clock' ? initial : null} />
   else if (response.type === 'chart-build') body = <ChartWidget response={response} locale={locale} onChange={onChange} initial={initial?.kind === 'chart' ? initial : null} />
@@ -246,47 +246,28 @@ function LineWidget({ response, onChange, initial }: { response: Extract<Respons
   )
 }
 
-function PlaneWidget({ response, onChange, initial }: { response: Extract<Response, { type: 'coordinate' }>; onChange: (answer: Answer | null) => void; initial: { x: number; y: number } | null }) {
+function PlaneWidget({ response, locale, onChange, initial, reveal }: { response: Extract<Response, { type: 'coordinate' }>; locale: Locale; onChange: (answer: Answer | null) => void; initial: { x: number; y: number } | null; reveal?: { x: number; y: number }[] }) {
   const [point, setPoint] = useState(initial)
-  const w = 280
-  const h = 280
-  const sx = (x: number) => 28 + ((x - response.xMin) / (response.xMax - response.xMin)) * (w - 56)
-  const sy = (y: number) => h - 28 - ((y - response.yMin) / (response.yMax - response.yMin)) * (h - 56)
+  const map = planeMap(response.xMin, response.xMax, response.yMin, response.yMax)
   const pick = (event: ReactPointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
-    const px = ((event.clientX - rect.left) / rect.width) * w
-    const py = ((event.clientY - rect.top) / rect.height) * h
-    const x = Math.round(response.xMin + ((px - 28) / (w - 56)) * (response.xMax - response.xMin))
-    const y = Math.round(response.yMin + ((h - 28 - py) / (h - 56)) * (response.yMax - response.yMin))
-    const next = { x: Math.min(response.xMax, Math.max(response.xMin, x)), y: Math.min(response.yMax, Math.max(response.yMin, y)) }
+    const raw = map.fromPixel(((event.clientX - rect.left) / rect.width) * map.w, ((event.clientY - rect.top) / rect.height) * map.h)
+    const next = {
+      x: Math.min(response.xMax, Math.max(response.xMin, raw.x)),
+      y: Math.min(response.yMax, Math.max(response.yMin, raw.y)),
+    }
     setPoint(next)
     onChange({ kind: 'points', points: [next] })
   }
-  const lines = []
-  for (let x = response.xMin; x <= response.xMax; x++) lines.push(<line key={`x${x}`} x1={sx(x)} y1={16} x2={sx(x)} y2={h - 16} stroke="#eadfce" />)
-  for (let y = response.yMin; y <= response.yMax; y++) lines.push(<line key={`y${y}`} x1={16} y1={sy(y)} x2={w - 16} y2={sy(y)} stroke="#eadfce" />)
-  const labels = []
-  const xSpan = response.xMax - response.xMin
-  const ySpan = response.yMax - response.yMin
-  const xStep = xSpan > 12 ? 2 : 1
-  const yStep = ySpan > 12 ? 2 : 1
-  for (let x = response.xMin; x <= response.xMax; x += xStep) {
-    labels.push(<text key={`lx${x}`} x={sx(x)} y={Math.min(h - 4, sy(0) + 14)} textAnchor="middle" fontSize="11" fill="currentColor">{x}</text>)
-  }
-  for (let y = response.yMin; y <= response.yMax; y += yStep) {
-    if (y === 0) continue
-    labels.push(<text key={`ly${y}`} x={Math.max(10, sx(0) - 8)} y={sy(y) + 4} textAnchor="end" fontSize="11" fill="currentColor">{y}</text>)
-  }
   return (
     <div>
-      <svg className="plane" viewBox={`0 0 ${w} ${h}`} onPointerDown={pick}>
-        {lines}
-        <line x1={sx(0)} y1="12" x2={sx(0)} y2={h - 12} stroke="currentColor" strokeWidth="2" />
-        <line x1="12" y1={sy(0)} x2={w - 12} y2={sy(0)} stroke="currentColor" strokeWidth="2" />
-        {labels}
-        {point ? <circle cx={sx(point.x)} cy={sy(point.y)} r="7" fill="#e25b45" /> : null}
-      </svg>
-      <p className="fine" style={{ textAlign: 'center' }}>{point ? `(${point.x}, ${point.y})` : ''}</p>
+      <PlaneGrid xMin={response.xMin} xMax={response.xMax} yMin={response.yMin} yMax={response.yMax} onPointerDown={pick}>
+        {point ? <circle cx={map.sx(point.x)} cy={map.sy(point.y)} r="7" fill="#e25b45" /> : null}
+        {reveal?.map((target, index) => (
+          <circle key={`reveal-${index}`} cx={map.sx(target.x)} cy={map.sy(target.y)} r="12" fill="none" stroke="#2f9e44" strokeWidth="3" strokeDasharray="5 4" />
+        ))}
+      </PlaneGrid>
+      <p className="fine plane-readout">{point ? `${t(locale, 'widget.mine')}: (${point.x}, ${point.y})` : t(locale, 'widget.tapPlane')}</p>
     </div>
   )
 }

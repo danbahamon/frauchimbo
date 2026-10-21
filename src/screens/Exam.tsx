@@ -10,7 +10,7 @@ import { monthIndex, uid } from '../lib/math'
 import { useStore } from '../state'
 import { DiffPips, KnobEditor } from '../components/chrome'
 import { AnswerWidget } from '../components/widgets'
-import { AnswerFace, StimulusView } from '../components/visuals'
+import { AnswerFace, QuestionStem, StimulusView, groupBySkill } from '../components/visuals'
 import { MathText } from '../components/MathText'
 import { Mascot } from '../components/Mascot'
 import { SkillDemo } from '../components/Preview'
@@ -233,10 +233,12 @@ function Builder() {
         })}
       </div>
       {total ? (
-        <div className="row" style={{ marginTop: 16 }}>
-          <button type="button" className="primary" onClick={() => go(blueprint())}>{t(locale, 'test.begin')}</button>
-          <button type="button" className="ghost" onClick={() => go(blueprint(), true)}>{t(locale, 'test.print')}</button>
-          <button type="button" className="text-btn" onClick={() => openShare(blueprint())}>{t(locale, 'test.share')}</button>
+        <div className="builder-actions">
+          <button type="button" className="primary wide" onClick={() => go(blueprint())}><Icon name="forward" />{t(locale, 'test.begin')}</button>
+          <div className="tool-row">
+            <button type="button" className="tool-btn" onClick={() => go(blueprint(), true)}><Icon name="print" />{t(locale, 'test.print')}</button>
+            <button type="button" className="tool-btn" onClick={() => openShare(blueprint())}><Icon name="share" />{t(locale, 'test.share')}</button>
+          </div>
         </div>
       ) : null}
     </div>
@@ -258,6 +260,24 @@ function Runner() {
     // Restart the clock for this visit without adding the time spent away.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  useEffect(() => {
+    if (mode !== 'focus') return
+    const onKey = (event: KeyboardEvent) => {
+      const tag = (event.target as HTMLElement | null)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || event.altKey || event.ctrlKey || event.metaKey) return
+      const current = hold.current
+      if (!current) return
+      const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+      if (!step) return
+      const index = current.index + step
+      if (index < 0 || index >= current.questions.length) return
+      const next = { ...stamp(current), index }
+      hold.current = next
+      setActive(next)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [mode, setActive])
   if (!active) {
     return (
       <div>
@@ -321,73 +341,89 @@ function Runner() {
   }
   const question = active.questions[active.index]
   const answered = active.responses.filter((item) => item != null).length
+  const total = active.questions.length
+  const pct = total ? Math.round((answered / total) * 100) : 0
+  const skill = question ? getSkill(question.skillId) : undefined
+  const printNow = () => requestPrint('blank', {
+    id: 'live',
+    blueprint: active.blueprint,
+    questions: active.questions,
+    responses: active.responses,
+    times: active.times,
+    correct: active.questions.map(() => false),
+    startedAt: active.startedAt,
+    finishedAt: Date.now(),
+    investigate: null,
+  })
   return (
     <div>
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <span className="kicker">{tx(locale, active.blueprint.title) || t(locale, 'home.test')}</span>
-        <span className="fine">{answered}/{active.questions.length}</span>
-      </div>
-      <div className="row">
-        <button type="button" className="chip" data-on={mode === 'focus'} onClick={() => setMode('focus')}>{t(locale, 'test.focus')}</button>
-        <button type="button" className="chip" data-on={mode === 'map'} onClick={() => setMode('map')}>{t(locale, 'test.map')}</button>
+      <header className="runner-head">
+        <div className="runner-title">
+          <p className="kicker">{tx(locale, active.blueprint.title) || t(locale, 'home.test')}</p>
+          <div className="progress" role="progressbar" aria-label={t(locale, 'test.progress')} aria-valuemin={0} aria-valuemax={total} aria-valuenow={answered}>
+            <i style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+        <span className="runner-count"><b>{answered}</b>/{total}</span>
+      </header>
+      <div className="runner-tools">
+        <div className="segment">
+          <button type="button" data-on={mode === 'focus'} onClick={() => setMode('focus')}>{t(locale, 'test.focus')}</button>
+          <button type="button" data-on={mode === 'map'} onClick={() => setMode('map')}>{t(locale, 'test.map')}</button>
+        </div>
+        <div className="tool-row">
+          <button type="button" className="tool-btn" onClick={printNow}><Icon name="print" />{t(locale, 'test.print')}</button>
+          <button type="button" className="tool-btn" onClick={() => openShare(active.blueprint)}><Icon name="share" />{t(locale, 'test.share')}</button>
+        </div>
       </div>
       {mode === 'map' ? (
-        <div className="booklet" style={{ marginTop: 12 }}>
-          <div className="qmap">
-            {active.questions.map((item, index) => (
-              <button key={item.id} type="button" className={`qdot${active.responses[index] != null ? ' on' : ''}${index === active.index ? ' here' : ''}`} onClick={() => jump(index)}>
-                {index + 1}
-              </button>
-            ))}
-          </div>
-          {active.questions.map((item, index) => (
-            <article key={item.id} className="q-card pad" onClick={() => jump(index)} style={{ cursor: 'pointer' }}>
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <b>{t(locale, 'test.q', { n: index + 1 })}</b>
-                <span className="fine">{active.responses[index] ? t(locale, 'test.answered') : t(locale, 'test.blank')}</span>
-              </div>
-              <p><MathText text={tx(locale, item.prompt)} /></p>
-              <StimulusView stimulus={item.stimulus} locale={locale} />
-              <AnswerFace question={item} answer={active.responses[index]} locale={locale} blank={t(locale, 'test.blank')} />
-            </article>
-          ))}
+        <div className="overview" style={{ marginTop: 12 }}>
+          {groupBySkill(active.questions).map((section) => {
+            const skill = getSkill(section.skillId)
+            return (
+              <section key={`${section.skillId}-${section.items[0]?.index}`}>
+                <h3 className="section-label">{skill ? `${skill.code} · ${tx(locale, skill.title)}` : section.skillId}</h3>
+                <div className="overview-grid">
+                  {section.items.map(({ question: item, index }) => (
+                    <button key={item.id} type="button" className="overview-q" data-on={active.responses[index] != null} onClick={() => jump(index)}>
+                      <span className="overview-top"><b>{index + 1}</b><small>{active.responses[index] ? t(locale, 'test.answered') : t(locale, 'test.blank')}</small></span>
+                      <QuestionStem question={item} locale={locale} />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )
+          })}
         </div>
       ) : (
         <div className="swap" key={question.id} style={{ marginTop: 8 }}>
-          <h2>{t(locale, 'test.q', { n: active.index + 1 })}</h2>
+          <div className="q-meta">
+            <h2 className="q-num">{t(locale, 'test.q', { n: active.index + 1 })}</h2>
+            {skill ? <span className="fine">{skill.code}</span> : null}
+          </div>
           <p className="prompt"><MathText text={tx(locale, question.prompt)} /></p>
           <StimulusView stimulus={question.stimulus} locale={locale} />
           <AnswerWidget key={question.id} response={question.response} locale={locale} initial={active.responses[active.index]} onChange={save} />
-          <div className="row" style={{ marginTop: 12 }}>
-            <button type="button" className="ghost" disabled={active.index === 0} onClick={() => jump(active.index - 1)}>{t(locale, 'on.back')}</button>
-            {active.index < active.questions.length - 1 ? (
-              <button type="button" className="primary" onClick={() => jump(active.index + 1)}>{t(locale, 'play.next')}</button>
-            ) : (
-              <button type="button" className="primary" onClick={finish}>{t(locale, 'test.finish')}</button>
-            )}
-          </div>
+          <nav className="nav-row" aria-label={t(locale, 'test.focus')}>
+            <button type="button" className="ghost" disabled={active.index === 0} onClick={() => jump(active.index - 1)}><Icon name="back" />{t(locale, 'on.back')}</button>
+            <span className="fine nav-count">{active.index + 1} / {total}</span>
+            {active.index < total - 1 ? (
+              <button type="button" className="primary" onClick={() => jump(active.index + 1)}>{t(locale, 'test.next')}<Icon name="forward" /></button>
+            ) : <span />}
+          </nav>
         </div>
       )}
-      <div className="row" style={{ marginTop: 16 }}>
-        {mode === 'map' || active.index < active.questions.length - 1 ? (
-          <button type="button" className="text-btn" onClick={finish}>{t(locale, 'test.finish')}</button>
-        ) : null}
-        <button type="button" className="ghost" onClick={() => requestPrint('blank', {
-          id: 'live',
-          blueprint: active.blueprint,
-          questions: active.questions,
-          responses: active.responses,
-          times: active.times,
-          correct: active.questions.map(() => false),
-          startedAt: active.startedAt,
-          finishedAt: Date.now(),
-          investigate: null,
-        })}>{t(locale, 'test.print')}</button>
-        <button type="button" className="ghost" onClick={() => openShare(active.blueprint)}>{t(locale, 'test.share')}</button>
-      </div>
+      <section className="finish-panel">
+        <div>
+          <b>{total - answered ? t(locale, 'test.finish.left', { n: total - answered }) : t(locale, 'test.finish.ready')}</b>
+          <p className="fine">{t(locale, 'test.finish.note')}</p>
+        </div>
+        <button type="button" className="primary warm" onClick={finish}><Icon name="check" />{t(locale, 'test.finish.button')}</button>
+      </section>
       {ask ? (
         <div className="modal-back">
           <div className="modal">
+            <Mascot mood="think" size={56} />
             <h2>{t(locale, 'test.confirm', { n: active.responses.filter((item) => item == null).length })}</h2>
             <div className="row">
               <button type="button" className="ghost" onClick={() => setAsk(false)}>{t(locale, 'test.stay')}</button>
@@ -522,11 +558,15 @@ function Summary() {
     <div>
       <p className="kicker">{t(locale, 'sum.dash')}</p>
       <h1>{tx(locale, test.blueprint.title) || t(locale, 'sum.score')}</h1>
-      <div className="sum-grid">
-        <article className="card sum-tile"><small>{t(locale, 'sum.score')}</small><b>{pct}%</b><span className="fine">{scored}/{test.questions.length}</span></article>
-        <article className="card sum-tile"><small>{t(locale, 'sum.time')}</small><b>{clock(totalTime)}</b></article>
-        <article className="card sum-tile"><small>{t(locale, 'sum.avg')}</small><b>{clock(totalTime / Math.max(1, test.questions.length))}</b></article>
-        <article className="card sum-tile"><small>{t(locale, 'sum.wrong')}</small><b>{test.questions.length - scored}</b></article>
+      <div className="summary-hero">
+        <div className="ring" style={{ ['--p' as string]: `${pct}%` }} role="img" aria-label={`${t(locale, 'sum.score')} ${pct}%`}>
+          <span><b className="score-num">{pct}%</b><small className="fine">{scored}/{test.questions.length}</small></span>
+        </div>
+        <div className="sum-grid">
+          <article className="card sum-tile"><small>{t(locale, 'sum.time')}</small><b>{clock(totalTime)}</b></article>
+          <article className="card sum-tile"><small>{t(locale, 'sum.avg')}</small><b>{clock(totalTime / Math.max(1, test.questions.length))}</b></article>
+          <article className="card sum-tile"><small>{t(locale, 'sum.wrong')}</small><b>{test.questions.length - scored}</b></article>
+        </div>
       </div>
       {test.investigate ? <p>{t(locale, 'sum.eye', { s: test.investigate.spotted, t: test.investigate.total })}</p> : null}
       {scored === test.questions.length ? <p><b>{t(locale, 'sum.perfect')}</b></p> : null}

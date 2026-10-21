@@ -1,3 +1,4 @@
+import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { Locale, Question, ShapeKind, Stimulus } from '../lib/types'
 import { tx } from '../lib/i18n'
 import { Expr, MathText, Tx } from './MathText'
@@ -241,6 +242,84 @@ function CoordFig({ xMin, xMax, yMin, yMax, points }: Extract<Stimulus, { type: 
         {labels}
         {points.map((point, index) => <circle key={index} cx={sx(point.x)} cy={sy(point.y)} r="6" fill="#e25b45" />)}
       </svg>
+    </div>
+  )
+}
+
+export function groupBySkill(questions: Question[]) {
+  const groups: { skillId: string; items: { question: Question; index: number }[] }[] = []
+  questions.forEach((question, index) => {
+    const last = groups[groups.length - 1]
+    if (last && last.skillId === question.skillId) last.items.push({ question, index })
+    else groups.push({ skillId: question.skillId, items: [{ question, index }] })
+  })
+  return groups
+}
+
+export const PLANE = { w: 280, h: 280, pad: 28 }
+
+export function planeMap(xMin: number, xMax: number, yMin: number, yMax: number) {
+  const { w, h, pad } = PLANE
+  const sx = (x: number) => pad + ((x - xMin) / (xMax - xMin)) * (w - pad * 2)
+  const sy = (y: number) => h - pad - ((y - yMin) / (yMax - yMin)) * (h - pad * 2)
+  const fromPixel = (px: number, py: number) => ({
+    x: Math.round(xMin + ((px - pad) / (w - pad * 2)) * (xMax - xMin)),
+    y: Math.round(yMin + ((h - pad - py) / (h - pad * 2)) * (yMax - yMin)),
+  })
+  return { w, h, sx, sy, fromPixel }
+}
+
+// Empty coordinate plane: grid, axes, and labels. It never draws a target point.
+export function PlaneGrid({ xMin, xMax, yMin, yMax, className = 'plane', onPointerDown, children }: { xMin: number; xMax: number; yMin: number; yMax: number; className?: string; onPointerDown?: (event: ReactPointerEvent<SVGSVGElement>) => void; children?: ReactNode }) {
+  const { w, h, sx, sy } = planeMap(xMin, xMax, yMin, yMax)
+  const lines: ReactNode[] = []
+  for (let x = xMin; x <= xMax; x++) lines.push(<line key={`x${x}`} x1={sx(x)} y1={16} x2={sx(x)} y2={h - 16} stroke="#eadfce" />)
+  for (let y = yMin; y <= yMax; y++) lines.push(<line key={`y${y}`} x1={16} y1={sy(y)} x2={w - 16} y2={sy(y)} stroke="#eadfce" />)
+  const xStep = xMax - xMin > 12 ? 2 : 1
+  const yStep = yMax - yMin > 12 ? 2 : 1
+  const labels: ReactNode[] = []
+  for (let x = xMin; x <= xMax; x += xStep) labels.push(<text key={`lx${x}`} x={sx(x)} y={Math.min(h - 4, sy(0) + 14)} textAnchor="middle" fontSize="11" fill="currentColor">{x}</text>)
+  for (let y = yMin; y <= yMax; y += yStep) {
+    if (y === 0) continue
+    labels.push(<text key={`ly${y}`} x={Math.max(10, sx(0) - 8)} y={sy(y) + 4} textAnchor="end" fontSize="11" fill="currentColor">{y}</text>)
+  }
+  return (
+    <svg className={className} viewBox={`0 0 ${w} ${h}`} onPointerDown={onPointerDown}>
+      {lines}
+      <line x1={sx(0)} y1="12" x2={sx(0)} y2={h - 12} stroke="currentColor" strokeWidth="2" />
+      <line x1="12" y1={sy(0)} x2={w - 12} y2={sy(0)} stroke="currentColor" strokeWidth="2" />
+      {labels}
+      {children}
+    </svg>
+  )
+}
+
+export function QuestionStem({ question, locale }: { question: Question; locale: Locale }) {
+  const response = question.response
+  return (
+    <div className="stem mini-fig">
+      <p><MathText text={tx(locale, question.prompt)} /></p>
+      {response.type === 'compare' ? (
+        <p className="stem-expr">
+          <MathText text={tx(locale, response.left)} />
+          <span>?</span>
+          <MathText text={tx(locale, response.right)} />
+        </p>
+      ) : null}
+      {response.type === 'order' ? (
+        <p className="fine">{response.items.map((item) => tx(locale, item.label)).join(' · ')}</p>
+      ) : null}
+      {response.type === 'choice' ? (
+        <ul className="choice-preview">
+          {response.options.map((option) => <li key={option.id}><MathText text={tx(locale, option.label)} /></li>)}
+        </ul>
+      ) : null}
+      {response.type === 'coordinate' && !(question.stimulus && question.stimulus.type === 'coord') ? (
+        <div className="mini-plane">
+          <PlaneGrid xMin={response.xMin} xMax={response.xMax} yMin={response.yMin} yMax={response.yMax} />
+        </div>
+      ) : null}
+      {question.stimulus && question.stimulus.type !== 'scene' ? <StimulusView stimulus={question.stimulus} locale={locale} /> : null}
     </div>
   )
 }

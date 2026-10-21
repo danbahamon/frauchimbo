@@ -5,7 +5,7 @@ import type { Answer, DomainId, KnobValues, Locale, Question, Skill } from '../l
 import { encodeShare, t, tx } from '../lib/i18n'
 import { localeTag } from '../lib/math'
 import { useStore } from '../state'
-import { StimulusView } from './visuals'
+import { QuestionStem, groupBySkill } from './visuals'
 import { MathText } from './MathText'
 
 export function KnobEditor({ skill, values, locale, onChange }: { skill: Skill; values: KnobValues; locale: Locale; onChange: (next: KnobValues) => void }) {
@@ -66,8 +66,6 @@ function clock(ms: number) {
   const total = Math.max(0, Math.round(ms / 1000))
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
 }
-
-const VISUAL = new Set(['clock', 'chart', 'coord', 'shape', 'grid', 'angle', 'protractor', 'spinner', 'dots', 'numberline'])
 
 function brief(question: Question, answer: Answer | null, locale: Locale, blank: string) {
   if (!answer) return blank
@@ -168,26 +166,34 @@ export function PrintSheet() {
             ))}
           </>
         ) : null}
-        <div className="print-questions">
-          {test.questions.map((question, index) => {
-            const visual = question.stimulus ? VISUAL.has(question.stimulus.type) : false
-            const miss = printJob.kind === 'teacher' && !test.correct[index]
+        <div className="print-stack">
+          {groupBySkill(test.questions).map((section) => {
+            const skill = getSkill(section.skillId)
             return (
-              <section className={miss ? 'print-q print-miss' : 'print-q'} key={question.id}>
-                <b>{index + 1}. {getSkill(question.skillId)?.code}</b>
-                <p><MathText text={tx(locale, question.prompt)} /></p>
-                {visual && question.stimulus ? <StimulusView stimulus={question.stimulus} locale={locale} /> : null}
-                {printJob.kind === 'blank' ? <div className="answer-line" /> : (
-                  <p>
-                    {test.correct[index] ? '✓' : '×'} {clock(test.times[index] ?? 0)} · {brief(question, test.responses[index], locale, t(locale, 'inv.blank'))}
-                    {miss ? ` → ${brief(question, question.answer, locale, '')}` : ''}
-                  </p>
-                )}
-                {miss ? (
-                  <ol className="steps">
-                    {question.steps.slice(0, 3).map((step, stepIndex) => <li key={stepIndex}><MathText text={tx(locale, step.text)} /></li>)}
-                  </ol>
-                ) : null}
+              <section key={`${section.skillId}-${section.items[0]?.index}`} className="print-section">
+                <h2>{skill ? `${skill.code} · ${tx(locale, skill.title)}` : section.skillId}</h2>
+                <div className="print-grid">
+                  {section.items.map(({ question, index }) => {
+                    const miss = printJob.kind === 'teacher' && !test.correct[index]
+                    return (
+                      <div className={miss ? 'print-q print-miss' : 'print-q'} key={question.id}>
+                        <b>{index + 1}</b>
+                        <QuestionStem question={question} locale={locale} />
+                        {printJob.kind === 'blank' ? (question.response.type === 'coordinate' ? null : <div className="write-line">&nbsp;</div>) : (
+                          <p>
+                            {test.correct[index] ? '✓' : '×'} {clock(test.times[index] ?? 0)} · {brief(question, test.responses[index], locale, t(locale, 'inv.blank'))}
+                            {miss ? ` → ${brief(question, question.answer, locale, '')}` : ''}
+                          </p>
+                        )}
+                        {miss ? (
+                          <ol className="steps">
+                            {question.steps.slice(0, 2).map((step, stepIndex) => <li key={stepIndex}><MathText text={tx(locale, step.text)} /></li>)}
+                          </ol>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
               </section>
             )
           })}

@@ -4,6 +4,7 @@ import { t, tx } from '../lib/i18n'
 import { practiceStreak } from '../lib/math'
 import { useStore } from '../state'
 import { Icon } from '../components/Icon'
+import { Mascot } from '../components/Mascot'
 
 function greetKey() {
   const hour = new Date().getHours()
@@ -22,9 +23,14 @@ export function Home() {
   const skill = lead ? getSkill(lead.skillId) : undefined
   return (
     <div>
-      <p className="kicker">{t(locale, 'home.standards')}</p>
-      <h1>{t(locale, greetKey())}, {profile.name}.</h1>
-      <p className="muted">{streak === 1 ? t(locale, 'home.streak.one') : streak ? t(locale, 'home.streak', { n: streak }) : t(locale, 'home.streak.zero')}</p>
+      <section className="hero-card">
+        <div className="hero-mascot"><Mascot mood={streak ? 'joy' : 'idle'} size={76} /></div>
+        <div className="hero-copy">
+          <p className="kicker">{t(locale, 'home.standards')}</p>
+          <h1>{t(locale, greetKey())}, {profile.name}.</h1>
+          <p className="muted">{streak === 1 ? t(locale, 'home.streak.one') : streak ? t(locale, 'home.streak', { n: streak }) : t(locale, 'home.streak.zero')}</p>
+        </div>
+      </section>
       <div className="hero-actions" style={{ marginTop: 16 }}>
         <button type="button" className="action" onClick={() => setRoute({ name: 'practice' })}>
           <Icon name="practice" size={28} />
