@@ -9,7 +9,7 @@ export function SkillDemo({ domain }: { domain: DomainId }) {
       </div>
     )
   }
-  if (domain === 'MD' || domain === 'SP') {
+  if (domain === 'MD') {
     return (
       <div className="demo bars" aria-hidden="true">
         <i /><i /><i /><i />

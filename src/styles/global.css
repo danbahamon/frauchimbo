@@ -531,11 +531,17 @@ h2 { font-size: 1.45rem; margin: 0 0 8px; overflow-wrap: break-word; }
   .hero-actions { grid-template-columns: 1fr; }
 }
 
-@media (prefers-reduced-motion: reduce), :root[data-motion='off'] {
+@media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
     transition: none !important;
   }
+}
+:root[data-motion='off'] *,
+:root[data-motion='off'] *::before,
+:root[data-motion='off'] *::after {
+  animation: none !important;
+  transition: none !important;
 }
 
 .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
