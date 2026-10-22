@@ -16,7 +16,6 @@ export function Workout() {
       <p className="kicker">{t(locale, 'nav.workout')}</p>
       <h1>{t(locale, 'work.title')}</h1>
       <p className="muted">{t(locale, 'work.sub')}</p>
-      <WorkoutStats />
       <h2 className="wk-pins">{t(locale, 'work.pins')}</h2>
       <p className="fine wk-legend">{t(locale, 'work.legend')}</p>
       {pins.length === 0 ? <p className="muted" style={{ marginTop: 16 }}>{t(locale, 'work.empty')}</p> : null}
@@ -49,6 +48,7 @@ export function Workout() {
           )
         })}
       </div>
+      <WorkoutStats />
     </div>
   )
 }
