@@ -1,4 +1,4 @@
-export type IconName = 'home' | 'practice' | 'test' | 'stats' | 'gear' | 'back' | 'spark' | 'print' | 'share' | 'check' | 'forward'
+export type IconName = 'home' | 'practice' | 'test' | 'stats' | 'gear' | 'back' | 'spark' | 'print' | 'share' | 'check' | 'forward' | 'pin'
 
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
@@ -15,6 +15,7 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
       {name === 'print' ? <path {...common} d="M7 9V4h10v5M6 9h12a2 2 0 0 1 2 2v5h-4v-3H8v3H4v-5a2 2 0 0 1 2-2zM8 17h8v4H8z" /> : null}
       {name === 'share' ? <path {...common} d="M12 3.5v11.5M7.5 8 12 3.5 16.5 8M5 13.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-5.5" /> : null}
       {name === 'check' ? <path {...common} d="M5 12.5 10 17.5 19 7" /> : null}
+      {name === 'pin' ? <path {...common} d="M9 3.5h6l-1 6h3l-5 5.2V21M12 14.7V21" /> : null}
     </svg>
   )
 }

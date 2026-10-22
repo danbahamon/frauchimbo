@@ -25,13 +25,68 @@ export interface Ctx {
   mode: string
 }
 
+// Pulls numeric questions toward smaller or larger values when a unit's extra settings change.
+function depthScale(knobs: KnobValues) {
+  let scale = 1
+  let used = false
+  if (typeof knobs.qty === 'number') {
+    used = true
+    const t = Math.min(1, Math.max(0, (knobs.qty - 2) / 6))
+    scale *= 0.62 + t * 0.55
+  }
+  if (typeof knobs.reach === 'number') {
+    used = true
+    const t = Math.min(1, Math.max(0, (knobs.reach - 6) / 54))
+    scale *= 0.5 + t * 0.7
+  }
+  if (typeof knobs.sides === 'number') {
+    used = true
+    scale *= 0.7 + Math.min(1, Math.max(0, (knobs.sides - 3) / 5)) * 0.5
+  }
+  if (typeof knobs.charts === 'number') {
+    used = true
+    scale *= 0.65 + Math.min(1, Math.max(0, (knobs.charts - 1) / 3)) * 0.5
+  }
+  if (knobs.twist === true) {
+    used = true
+    scale *= 1.18
+  } else if (knobs.twist === false) {
+    used = true
+    scale *= 0.9
+  }
+  if (knobs.mix === true) {
+    used = true
+    scale *= 1.22
+  } else if (knobs.mix === false) {
+    used = true
+    scale *= 0.92
+  }
+  return used ? Math.min(1.35, Math.max(0.4, scale)) : 1
+}
+
+function scaleRng(rng: Rng, scale: number): Rng {
+  if (Math.abs(scale - 1) < 0.02) return rng
+  return {
+    int(min, max) {
+      if (!(max > min)) return rng.int(min, max)
+      const span = max - min
+      if (span <= 2) return rng.int(min, max)
+      const capped = Math.min(max, Math.max(min + 1, min + Math.round(span * Math.min(1, scale))))
+      return rng.int(min, capped)
+    },
+    pick: (arr) => rng.pick(arr),
+    shuffle: (arr) => rng.shuffle(arr),
+    chance: (p) => rng.chance(p),
+  }
+}
+
 export function makeCtx(skill: Skill, difficulty: number, knobs: KnobValues): Ctx {
   const modeValue = knobs.mode
   return {
     skill,
-    difficulty,
+    difficulty: Math.min(5, Math.max(1, Math.round(difficulty))),
     knobs,
-    rng: makeRng(),
+    rng: scaleRng(makeRng(), depthScale(knobs)),
     mode: typeof modeValue === 'string' ? modeValue : '',
   }
 }

@@ -10,15 +10,19 @@ import { Play } from './Play'
 import { Exam } from './Exam'
 import { Stats } from './Stats'
 import { Settings } from './Settings'
+import { Workout } from './Workout'
 
 const NAV = [
   ['home', 'nav.home', 'home'],
   ['practice', 'nav.practice', 'practice'],
+  ['workout', 'nav.workout', 'pin'],
   ['test', 'nav.test', 'test'],
   ['stats', 'nav.stats', 'stats'],
 ] as const
 
-function Nav({ tab, locale, onPick }: { tab: string; locale: Locale; onPick: (name: 'home' | 'practice' | 'test' | 'stats') => void }) {
+type TabName = 'home' | 'practice' | 'workout' | 'test' | 'stats'
+
+function Nav({ tab, locale, onPick }: { tab: string; locale: Locale; onPick: (name: TabName) => void }) {
   return (
     <>
       {NAV.map(([name, key, icon]) => (
@@ -33,6 +37,7 @@ function Nav({ tab, locale, onPick }: { tab: string; locale: Locale; onPick: (na
 
 function tabOf(route: Route) {
   if (route.name === 'practice' || route.name === 'play') return 'practice'
+  if (route.name === 'workout') return 'workout'
   if (route.name === 'test' || route.name === 'run' || route.name === 'choose' || route.name === 'investigate' || route.name === 'summary' || route.name === 'shared') return 'test'
   if (route.name === 'stats') return 'stats'
   return 'home'
@@ -48,11 +53,11 @@ export function Shell() {
   }, [stored.name, setRoute])
   const route: Route = stored.name === 'settings' ? { name: 'home' } : stored
   const tab = tabOf(route)
-  const go = (name: 'home' | 'practice' | 'test' | 'stats') => {
+  const go = (name: TabName) => {
     setSettingsOpen(false)
     setRoute({ name })
   }
-  const screenKey = route.name === 'play' ? `play-${route.skillId}` : route.name === 'practice' ? `practice-${route.skillId ?? ''}` : route.name
+  const screenKey = route.name === 'play' ? ('queue' in route ? 'play-queue' : `play-${route.skillId}`) : route.name === 'practice' ? `practice-${route.skillId ?? ''}` : route.name
   return (
     <>
       <aside className="rail">
@@ -81,6 +86,7 @@ export function Shell() {
           <div className="rise" key={screenKey}>
             {route.name === 'home' ? <Home /> : null}
             {route.name === 'practice' ? <Practice /> : null}
+            {route.name === 'workout' ? <Workout /> : null}
             {route.name === 'play' ? <Play /> : null}
             {route.name === 'test' || route.name === 'run' || route.name === 'choose' || route.name === 'investigate' || route.name === 'summary' || route.name === 'shared' ? <Exam /> : null}
             {route.name === 'stats' ? <Stats /> : null}

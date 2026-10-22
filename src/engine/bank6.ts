@@ -242,17 +242,18 @@ export function g6g(ctx: Ctx) {
 
 export function g6spA(ctx: Ctx) {
   if (ctx.mode === 'spread') {
-    const pack = textChoice(L('1, 2, 8, 9', '1, 2, 8, 9', '1, 2, 8, 9'), [L('4, 5, 5, 6', '4, 5, 5, 6', '4, 5, 5, 6')], ctx.rng)
+    const wide = Math.max(6, knobNum(ctx, 'qty', 8))
+    const pack = textChoice(L(`1, 2, ${wide}, ${wide + 1}`, `1, 2, ${wide}, ${wide + 1}`, `1, 2, ${wide}, ${wide + 1}`), [L(`${wide - 2}, ${wide - 1}, ${wide - 1}, ${wide}`, `${wide - 2}, ${wide - 1}, ${wide - 1}, ${wide}`, `${wide - 2}, ${wide - 1}, ${wide - 1}, ${wide}`)], ctx.rng)
     return ask(ctx, L('Which set varies more?', 'Welche Menge streut stärker?', '¿Cuál conjunto varía más?'), { type: 'choice', options: pack.options }, pack.answer, [
       L('Compare the ranges.', 'Vergleiche die Spannweiten.', 'Compara los rangos.'),
-      L('From 1 to 9 the range is 8. From 4 to 6 the range is 2.', 'Von 1 bis 9 ist die Spannweite 8. Von 4 bis 6 ist sie 2.', 'De 1 a 9 el rango es 8. De 4 a 6 es 2.'),
+      L(`From 1 to ${wide + 1} the range is ${wide}. The other set stays within 2.`, `Von 1 bis ${wide + 1} ist die Spannweite ${wide}. Die andere Menge bleibt innerhalb von 2.`, `De 1 a ${wide + 1} el rango es ${wide}. El otro conjunto se queda dentro de 2.`),
     ])
   }
   const pack = textChoice(
     L('How many minutes did students in our class read last night?', 'Wie viele Minuten haben die Schülerinnen und Schüler unserer Klasse gestern Abend gelesen?', '¿Cuántos minutos leyeron anoche las estudiantes de nuestra clase?'),
     [
       L('How many tentacles are drawn on this snail?', 'Wie viele Fühler sind auf dieser Schnecke gezeichnet?', '¿Cuántos tentáculos tiene dibujados este caracol?'),
-      L('What is 8 × 7?', 'Wie viel ist 8 × 7?', '¿Cuánto es 8 × 7?'),
+      L(`What is ${n(Math.max(2, knobNum(ctx, 'qty', 8))).en} × ${n(3 + knobNum(ctx, 'charts', 4)).en}?`, `Wie viel ist ${n(Math.max(2, knobNum(ctx, 'qty', 8))).de} × ${n(3 + knobNum(ctx, 'charts', 4)).de}?`, `¿Cuánto es ${n(Math.max(2, knobNum(ctx, 'qty', 8))).es} × ${n(3 + knobNum(ctx, 'charts', 4)).es}?`),
     ],
     ctx.rng,
   )

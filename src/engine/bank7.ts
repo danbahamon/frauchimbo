@@ -1,5 +1,5 @@
 import { gcd, roundTo, simplify } from '../lib/math'
-import { ask, expression, familyOf, frac, knobNum, L, n, textChoice, type Ctx } from './shared'
+import { ask, expression, familyOf, frac, knobBool, knobNum, L, n, textChoice, type Ctx } from './shared'
 import { fractionQuestion } from './bank4'
 import { equation } from './algebra'
 import { dataSet } from './bank6'
@@ -259,8 +259,10 @@ export function g7gB(ctx: Ctx) {
 }
 
 export function g7spA(ctx: Ctx) {
+  const every = Math.max(2, knobNum(ctx, 'qty', 10))
+  const groups = Math.max(1, knobNum(ctx, 'charts', 2))
   const pack = textChoice(
-    L('Ask every tenth customer, all day.', 'Frage den ganzen Tag über jede zehnte Person.', 'Pregunta todo el día a cada décima persona.'),
+    L(`Ask every ${every}th customer, across ${groups === 1 ? 'the whole day' : `${groups} different hours`}.`, `Frage ${groups === 1 ? 'den ganzen Tag' : `in ${groups} verschiedenen Stunden`} jede ${every}. Person.`, `Pregunta a cada ${every}.ª persona, durante ${groups === 1 ? 'todo el día' : `${groups} horas distintas`}.`),
     [
       L('Ask only your four closest friends.', 'Frage nur deine vier engsten Freundinnen und Freunde.', 'Pregunta solo a tus cuatro amigos más cercanos.'),
       L('Ask people already buying honey cake.', 'Frage Leute, die schon Honigkuchen kaufen.', 'Pregunta a quienes ya compran pastel de miel.'),
@@ -274,12 +276,15 @@ export function g7spA(ctx: Ctx) {
 }
 
 export function g7spB(ctx: Ctx) {
-  const a = dataSet(ctx, 4, 8)
-  const b = dataSet(ctx, 4, 4)
+  const size = Math.max(4, knobNum(ctx, 'qty', 6))
+  const low = 4 + knobNum(ctx, 'charts', 1)
+  const high = low + (knobBool(ctx, 'twist', false) ? 6 : 4)
+  const a = dataSet(ctx, size, high)
+  const b = dataSet(ctx, size, low)
   const pack = textChoice(L('Group A', 'Gruppe A', 'Grupo A'), [L('Group B', 'Gruppe B', 'Grupo B'), L('The means are equal', 'Die Mittelwerte sind gleich', 'Las medias son iguales')], ctx.rng)
   return ask(ctx, L('Which group has the greater mean?', 'Welche Gruppe hat den größeren Mittelwert?', '¿Qué grupo tiene la media mayor?'), { type: 'choice', options: pack.options }, pack.answer, [
-    L(`Group A averages 8. Group B averages 4.`, `Gruppe A hat den Mittelwert 8. Gruppe B hat den Mittelwert 4.`, `El grupo A promedia 8. El grupo B promedia 4.`),
-    L('8 is greater than 4, so Group A has the greater mean.', '8 ist größer als 4, also hat Gruppe A den größeren Mittelwert.', '8 es mayor que 4, así que el grupo A tiene la media mayor.'),
+    L(`Group A averages ${n(high).en}. Group B averages ${n(low).en}.`, `Gruppe A hat den Mittelwert ${n(high).de}. Gruppe B hat den Mittelwert ${n(low).de}.`, `El grupo A promedia ${n(high).es}. El grupo B promedia ${n(low).es}.`),
+    L(`${n(high).en} is greater than ${n(low).en}, so Group A has the greater mean.`, `${n(high).de} ist größer als ${n(low).de}, also hat Gruppe A den größeren Mittelwert.`, `${n(high).es} es mayor que ${n(low).es}, así que el grupo A tiene la media mayor.`),
   ], { type: 'pair-lists', aTitle: L('Group A', 'Gruppe A', 'Grupo A'), bTitle: L('Group B', 'Gruppe B', 'Grupo B'), a, b })
 }
 

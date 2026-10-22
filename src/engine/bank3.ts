@@ -428,14 +428,15 @@ export function g3mdA(ctx: Ctx) {
     )
   }
   if (ctx.mode === 'mass') {
+    const kg = Math.min(12, Math.max(2, knobNum(ctx, 'qty', 4)))
     const pack = textChoice(
-      L('4 kilograms', '4 Kilogramm', '4 kilogramos'),
-      [L('4 grams', '4 Gramm', '4 gramos'), L('4 liters', '4 Liter', '4 litros'), L('400 kilograms', '400 Kilogramm', '400 kilogramos')],
+      L(`${kg} kilograms`, `${kg} Kilogramm`, `${kg} kilogramos`),
+      [L(`${kg} grams`, `${kg} Gramm`, `${kg} gramos`), L(`${kg} liters`, `${kg} Liter`, `${kg} litros`), L(`${kg * (knobBool(ctx, 'twist', false) ? 100 : 50)} kilograms`, `${kg * (knobBool(ctx, 'twist', false) ? 100 : 50)} Kilogramm`, `${kg * (knobBool(ctx, 'twist', false) ? 100 : 50)} kilogramos`)],
       ctx.rng,
     )
     return ask(
       ctx,
-      L('Which is the best estimate for the mass of a cat?', 'Was ist die beste Schätzung für die Masse einer Katze?', '¿Cuál es la mejor estimación para la masa de un gato?'),
+      L(`Which is the best estimate for the mass of a cat?`, `Was ist die beste Schätzung für die Masse einer Katze?`, `¿Cuál es la mejor estimación para la masa de un gato?`),
       { type: 'choice', options: pack.options },
       pack.answer,
       [
@@ -715,51 +716,54 @@ const SHAPE_LABEL = {
 
 export function g3g(ctx: Ctx) {
   if (ctx.mode === 'partition') {
-    const good = { id: 'ok', label: L('Four equal parts', 'Vier gleiche Teile', 'Cuatro partes iguales'), shape: 'square' as const, parts: 4, shaded: 1 }
+    const parts = Math.min(6, Math.max(2, knobNum(ctx, 'qty', 4)))
+    const sides = Math.min(6, Math.max(3, knobNum(ctx, 'sides', 4)))
+    const shape = sides <= 3 ? 'triangle' as const : sides === 5 ? 'pentagon' as const : sides >= 6 ? 'hexagon' as const : 'square' as const
+    const shaded = knobBool(ctx, 'twist', false) ? Math.min(parts - 1, 2) : 1
+    const word = parts === 2 ? L('halves', 'Hälften', 'medios') : parts === 3 ? L('thirds', 'Drittel', 'tercios') : parts === 4 ? L('fourths', 'Viertel', 'cuartos') : parts === 5 ? L('fifths', 'Quintos', 'quintos') : L('sixths', 'Sechstel', 'sextos')
+    const good = { id: 'ok', label: L(`${parts} equal parts`, `${parts} gleiche Teile`, `${parts} partes iguales`), shape, parts, shaded }
     const bad = [
-      { id: 'a', label: L('Four unequal parts', 'Vier ungleiche Teile', 'Cuatro partes desiguales'), shape: 'square' as const, parts: 4, shaded: 1, uneven: true },
-      { id: 'b', label: L('Three equal parts', 'Drei gleiche Teile', 'Tres partes iguales'), shape: 'square' as const, parts: 3, shaded: 1 },
-      { id: 'c', label: L('Two equal parts', 'Zwei gleiche Teile', 'Dos partes iguales'), shape: 'rectangle' as const, parts: 2, shaded: 1 },
+      { id: 'a', label: L(`${parts} unequal parts`, `${parts} ungleiche Teile`, `${parts} partes desiguales`), shape, parts, shaded, uneven: true },
+      { id: 'b', label: L(`${Math.max(2, parts - 1)} equal parts`, `${Math.max(2, parts - 1)} gleiche Teile`, `${Math.max(2, parts - 1)} partes iguales`), shape, parts: Math.max(2, parts - 1), shaded: 1 },
+      { id: 'c', label: L(`${parts >= 6 ? 2 : parts + 1} equal parts`, `${parts >= 6 ? 2 : parts + 1} gleiche Teile`, `${parts >= 6 ? 2 : parts + 1} partes iguales`), shape: 'rectangle' as const, parts: parts >= 6 ? 2 : parts + 1, shaded: 1 },
     ]
     const pack = pickedChoice(good, bad, ctx.rng)
     return ask(
       ctx,
-      L('Which figure shows fourths?', 'Welche Figur zeigt Viertel?', '¿Cuál figura muestra cuartos?'),
+      L(`Which figure shows ${word.en}?`, `Welche Figur zeigt ${word.de}?`, `¿Cuál figura muestra ${word.es}?`),
       { type: 'choice', options: pack.options },
       pack.answer,
       [
-        L('Fourths means four parts of the same size.', 'Viertel bedeutet vier Teile derselben Größe.', 'Cuartos significa cuatro partes del mismo tamaño.'),
+        L(`${word.en[0].toUpperCase()}${word.en.slice(1)} means ${n(parts).en} parts of the same size.`, `${word.de} bedeutet ${n(parts).de} Teile derselben Größe.`, `${word.es[0].toUpperCase()}${word.es.slice(1)} significa ${n(parts).es} partes del mismo tamaño.`),
         L('Equal area matters more than the number of cuts.', 'Gleicher Flächeninhalt zählt mehr als die Anzahl der Schnitte.', 'El área igual importa más que el número de cortes.'),
       ],
     )
   }
   if (ctx.mode === 'attribute') {
-    const pack = textChoice(
-      L('It has 4 right angles.', 'Es hat 4 rechte Winkel.', 'Tiene 4 ángulos rectos.'),
-      [
-        L('It has exactly 3 sides.', 'Es hat genau 3 Seiten.', 'Tiene exactamente 3 lados.'),
-        L('It has no straight sides.', 'Es hat keine geraden Seiten.', 'No tiene lados rectos.'),
-        L('It has 5 vertices.', 'Es hat 5 Ecken.', 'Tiene 5 vértices.'),
-      ],
-      ctx.rng,
-    )
+    const sides = Math.min(6, Math.max(3, knobNum(ctx, 'sides', 4)))
+    const copies = Math.max(1, knobNum(ctx, 'qty', 1))
+    const extra = knobBool(ctx, 'twist', false) ? 1 : 0
+    const shape = sides === 3 ? 'triangle' as const : sides === 5 ? 'pentagon' as const : sides >= 6 ? 'hexagon' as const : 'rectangle' as const
+    const each = sides >= 6 ? 6 : sides === 5 ? 5 : sides === 3 ? 3 : 4
+    const total = each * copies + extra
     return ask(
       ctx,
-      L('Which sentence is true for every rectangle?', 'Welcher Satz stimmt für jedes Rechteck?', '¿Cuál oración es cierta para todo rectángulo?'),
-      { type: 'choice', options: pack.options },
-      pack.answer,
+      extra
+        ? L(`There are ${n(copies).en} of these figures, and then one extra side is drawn. How many sides are there in all?`, `Es gibt ${n(copies).de} dieser Figuren, und dann wird eine extra Seite gezeichnet. Wie viele Seiten sind es zusammen?`, `Hay ${n(copies).es} de estas figuras y luego se dibuja un lado extra. ¿Cuántos lados hay en total?`)
+        : L(`There are ${n(copies).en} of these figures. How many sides are there in all?`, `Es gibt ${n(copies).de} dieser Figuren. Wie viele Seiten sind es zusammen?`, `Hay ${n(copies).es} de estas figuras. ¿Cuántos lados hay en total?`),
+      { type: 'number' },
+      { kind: 'number', value: total },
       [
-        L('A rectangle has four sides and four right angles.', 'Ein Rechteck hat vier Seiten und vier rechte Winkel.', 'Un rectángulo tiene cuatro lados y cuatro ángulos rectos.'),
-        L('Squares are rectangles, and they also have four right angles.', 'Quadrate sind Rechtecke, und auch sie haben vier rechte Winkel.', 'Los cuadrados son rectángulos, y también tienen cuatro ángulos rectos.'),
+        L(`Each figure has ${n(each).en} sides.`, `Jede Figur hat ${n(each).de} Seiten.`, `Cada figura tiene ${n(each).es} lados.`),
+        L(`${n(copies).en} × ${n(each).en}${extra ? ` + ${n(extra).en}` : ''} = ${n(total).en}.`, `${n(copies).de} × ${n(each).de}${extra ? ` + ${n(extra).de}` : ''} = ${n(total).de}.`, `${n(copies).es} × ${n(each).es}${extra ? ` + ${n(extra).es}` : ''} = ${n(total).es}.`),
       ],
-      { type: 'shape', shape: 'rectangle' },
+      { type: 'shape', shape },
     )
   }
-  // Pentagons and hexagons join the names only when the advanced toggle is on.
-  const basic: (keyof typeof SHAPE_LABEL)[] = ['square', 'rectangle', 'triangle']
-  const pool: (keyof typeof SHAPE_LABEL)[] = knobBool(ctx, 'advanced', true) ? [...basic, 'pentagon', 'hexagon'] : basic
-  const shape = ctx.rng.pick(pool)
-  const names = pool.filter((item) => item !== shape).slice(0, 3)
+  const sides = Math.min(6, Math.max(3, knobNum(ctx, 'sides', 4)))
+  const shape = (sides === 3 ? 'triangle' : sides === 5 ? 'pentagon' : sides === 6 ? 'hexagon' : knobBool(ctx, 'twist', false) ? 'rectangle' : 'square') as keyof typeof SHAPE_LABEL
+  const pool: (keyof typeof SHAPE_LABEL)[] = ['square', 'rectangle', 'triangle', 'pentagon', 'hexagon']
+  const names = pool.filter((item) => item !== shape).slice(0, Math.max(2, Math.min(4, knobNum(ctx, 'qty', 3))))
   const pack = textChoice(SHAPE_LABEL[shape], names.map((item) => SHAPE_LABEL[item]), ctx.rng)
   return ask(
     ctx,

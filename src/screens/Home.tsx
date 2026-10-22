@@ -37,6 +37,10 @@ export function Home() {
           <Icon name="practice" size={28} />
           <span><b>{t(locale, 'home.practice')}</b><span>{t(locale, 'home.practice.sub')}</span></span>
         </button>
+        <button type="button" className="action" onClick={() => setRoute({ name: 'workout' })}>
+          <Icon name="pin" size={28} />
+          <span><b>{t(locale, 'home.workout')}</b><span>{t(locale, 'home.workout.sub')}</span></span>
+        </button>
         <button type="button" className="action" onClick={() => setRoute({ name: 'test' })}>
           <Icon name="test" size={28} />
           <span><b>{t(locale, 'home.test')}</b><span>{t(locale, 'home.test.sub')}</span></span>

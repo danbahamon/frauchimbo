@@ -260,10 +260,17 @@ export interface ActiveTest {
   questionStartedAt: number
 }
 
+export interface Pin {
+  skillId: string
+  knobs: KnobValues
+}
+
 export type Route =
   | { name: 'home' }
   | { name: 'practice'; skillId?: string }
-  | { name: 'play'; skillId: string; auto?: boolean; difficulty?: number }
+  | { name: 'play'; skillId: string; auto?: boolean; difficulty?: number; knobs?: KnobValues }
+  | { name: 'play'; queue: BlueprintItem[] }
+  | { name: 'workout' }
   | { name: 'test' }
   | { name: 'run' }
   | { name: 'choose'; id: string }

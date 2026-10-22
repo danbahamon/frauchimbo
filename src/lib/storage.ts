@@ -1,4 +1,4 @@
-import type { ActiveTest, Attempt, Profile, Route, TestRecord } from './types'
+import type { ActiveTest, Attempt, Pin, Profile, Route, TestRecord } from './types'
 
 const KEY = 'frauchimbo.v1'
 
@@ -9,6 +9,7 @@ export interface Persisted {
   tests: TestRecord[]
   active: ActiveTest | null
   route: Route
+  pins: Pin[]
 }
 
 export const emptyState = (): Persisted => ({
@@ -18,6 +19,7 @@ export const emptyState = (): Persisted => ({
   tests: [],
   active: null,
   route: { name: 'home' },
+  pins: [],
 })
 
 export function loadState(): Persisted {
@@ -31,6 +33,7 @@ export function loadState(): Persisted {
       ...data,
       attempts: Array.isArray(data.attempts) ? data.attempts.slice(-2000) : [],
       tests: Array.isArray(data.tests) ? data.tests.slice(-12) : [],
+      pins: Array.isArray(data.pins) ? data.pins : [],
     }
   } catch {
     return emptyState()
@@ -75,6 +78,7 @@ export function parseBackup(text: string): Persisted | null {
       tests: data.tests.slice(-12),
       active: data.active ?? null,
       route: data.route?.name ? data.route : { name: 'home' },
+      pins: Array.isArray(data.pins) ? data.pins : [],
     }
   } catch {
     return null

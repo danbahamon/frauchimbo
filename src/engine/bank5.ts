@@ -16,7 +16,7 @@ function exprText(pieces: Array<{ t: 'v'; value: number } | { t: 'op'; v: string
 }
 
 export function g5oaA(ctx: Ctx) {
-  const top = Math.max(4, knobNum(ctx, 'max', 12))
+  const top = Math.max(4, Math.round(knobNum(ctx, 'max', 12) * (0.55 + knobNum(ctx, 'qty', 3) / 8)))
   const shape = knobStr(ctx, 'shape', 'sumprod')
   const cCap = Math.max(2, Math.min(top, shape === 'three' ? 15 : top))
   const a = span(ctx, 2, top)
@@ -28,7 +28,7 @@ export function g5oaA(ctx: Ctx) {
     const sum = divisor * parts
     const left = span(ctx, 1, Math.max(1, sum - 1))
     const right = sum - left
-    const grouped = ctx.mode === 'words' || ctx.rng.chance(0.55)
+    const grouped = ctx.mode === 'words' || (!knobBool(ctx, 'twist', false) && ctx.rng.chance(0.55))
     const loose = divisor * span(ctx, 2, Math.max(2, Math.floor(top / divisor) || 2))
     const head = span(ctx, 2, top)
     const value = grouped ? parts : head + loose / divisor
@@ -61,7 +61,7 @@ export function g5oaA(ctx: Ctx) {
   }
   if (shape === 'three') {
     const factor = span(ctx, 2, Math.max(2, Math.min(top, 12)))
-    const grouped = ctx.mode === 'words' || ctx.rng.chance(0.55)
+    const grouped = ctx.mode === 'words' || (!knobBool(ctx, 'twist', false) && ctx.rng.chance(0.55))
     const product = grouped ? (a + b) * factor : a + b * factor
     const take = span(ctx, 1, Math.max(1, Math.min(top, product)))
     const value = product - take
@@ -91,7 +91,7 @@ export function g5oaA(ctx: Ctx) {
     const factor = span(ctx, 2, Math.max(2, Math.min(top, 20)))
     const small = span(ctx, 2, top)
     const large = small + span(ctx, 1, top)
-    const grouped = ctx.mode === 'words' || ctx.rng.chance(0.55)
+    const grouped = ctx.mode === 'words' || (!knobBool(ctx, 'twist', false) && ctx.rng.chance(0.55))
     const product = small * factor
     const head = product + span(ctx, 0, top)
     const value = grouped ? (large - small) * factor : head - product
@@ -122,7 +122,7 @@ export function g5oaA(ctx: Ctx) {
     }
     return ask(ctx, L('Evaluate the expression.', 'Werte den Term aus.', 'Evalúa la expresión.'), { type: 'number' }, { kind: 'number', value }, steps, expression(pieces))
   }
-  const grouped = ctx.mode === 'words' || ctx.rng.chance(0.55)
+  const grouped = ctx.mode === 'words' || (!knobBool(ctx, 'twist', false) && ctx.rng.chance(0.55))
   const value = grouped ? (a + b) * c : a + b * c
   const pieces = grouped
     ? [{ t: 'op' as const, v: '(' }, { t: 'v' as const, value: a }, { t: 'op' as const, v: '+' }, { t: 'v' as const, value: b }, { t: 'op' as const, v: ')' }, { t: 'op' as const, v: '×' }, { t: 'v' as const, value: c }]
@@ -504,7 +504,7 @@ export function g5mdA(ctx: Ctx) {
 
 export function g5mdB(ctx: Ctx) {
   const labels = ['1/8', '1/4', '1/2', '3/4', '1']
-  const counts = labels.map(() => ctx.rng.int(1, 5))
+  const counts = labels.map(() => ctx.rng.int(1, Math.max(2, knobNum(ctx, 'qty', 4))))
   const values = [0.125, 0.25, 0.5, 0.75, 1]
   if (ctx.mode === 'greater') {
     const threshold = 0.5
@@ -638,31 +638,40 @@ export function g5gA(ctx: Ctx) {
 }
 
 export function g5gB(ctx: Ctx) {
+  const sides = Math.min(6, Math.max(3, knobNum(ctx, 'sides', 4)))
+  const right = knobBool(ctx, 'twist', false)
+  const shape = sides <= 3 ? 'triangle' as const : sides === 5 ? 'pentagon' as const : sides >= 6 ? 'hexagon' as const : right ? 'rectangle' as const : 'rhombus' as const
+  const actual = shape === 'triangle' ? 3 : shape === 'pentagon' ? 5 : shape === 'hexagon' ? 6 : 4
+  const name = shape === 'triangle' ? L('triangle', 'Dreieck', 'triángulo') : shape === 'pentagon' ? L('pentagon', 'Fünfeck', 'pentágono') : shape === 'hexagon' ? L('hexagon', 'Sechseck', 'hexágono') : shape === 'rectangle' ? L('rectangle', 'Rechteck', 'rectángulo') : L('rhombus', 'Raute', 'rombo')
   if (ctx.mode === 'figure') {
     const pack = textChoice(
-      L('rhombus', 'Raute', 'rombo'),
-      [L('scalene triangle', 'ungleichseitiges Dreieck', 'triángulo escaleno'), L('A figure with only one pair of parallel sides', 'Eine Figur mit nur einem parallelen Paar', 'Una figura con un solo par de lados paralelos')],
+      name,
+      [
+        L('scalene triangle', 'ungleichseitiges Dreieck', 'triángulo escaleno'),
+        L('pentagon', 'Fünfeck', 'pentágono'),
+        L('hexagon', 'Sechseck', 'hexágono'),
+        L('A figure with only one pair of parallel sides', 'Eine Figur mit nur einem parallelen Paar', 'Una figura con un solo par de lados paralelos'),
+      ].filter((item) => item.en !== name.en).slice(0, Math.max(2, Math.min(3, knobNum(ctx, 'qty', 2)))),
       ctx.rng,
     )
-    return ask(
-      ctx,
-      L('Which figure is a parallelogram with all sides equal, and is not required to have right angles?', 'Welche Figur ist ein Parallelogramm mit lauter gleichen Seiten und muss keine rechten Winkel haben?', '¿Cuál figura es un paralelogramo con todos los lados iguales y no exige ángulos rectos?'),
-      { type: 'choice', options: pack.options },
-      pack.answer,
-      [
-        L('A rhombus has four equal sides. A square is a special rhombus with right angles.', 'Eine Raute hat vier gleiche Seiten. Ein Quadrat ist eine besondere Raute mit rechten Winkeln.', 'Un rombo tiene cuatro lados iguales. Un cuadrado es un rombo especial con ángulos rectos.'),
-        L('The description points to the rhombus.', 'Die Beschreibung zeigt auf die Raute.', 'La descripción señala al rombo.'),
-      ],
-      { type: 'shape', shape: 'rhombus' },
-    )
+    const prompt = actual === 4 && right
+      ? L('Which figure has 4 sides and 4 right angles?', 'Welche Figur hat 4 Seiten und 4 rechte Winkel?', '¿Cuál figura tiene 4 lados y 4 ángulos rectos?')
+      : actual === 4
+        ? L('Which figure has 4 equal sides and is not required to have right angles?', 'Welche Figur hat 4 gleiche Seiten und muss keine rechten Winkel haben?', '¿Cuál figura tiene 4 lados iguales y no exige ángulos rectos?')
+        : L(`Which figure has ${n(actual).en} sides?`, `Welche Figur hat ${n(actual).de} Seiten?`, `¿Cuál figura tiene ${n(actual).es} lados?`)
+    return ask(ctx, prompt, { type: 'choice', options: pack.options }, pack.answer, [
+      L(`Count the sides. This figure has ${n(actual).en}.`, `Zähle die Seiten. Diese Figur hat ${n(actual).de}.`, `Cuenta los lados. Esta figura tiene ${n(actual).es}.`),
+      L(`The name that fits is ${name.en}.`, `Der passende Name ist ${name.de}.`, `El nombre que encaja es ${name.es}.`),
+    ], { type: 'shape', shape })
   }
+  const copies = Math.max(1, knobNum(ctx, 'qty', 2))
   const pack = textChoice(
-    L('Every square is a rectangle.', 'Jedes Quadrat ist ein Rechteck.', 'Todo cuadrado es un rectángulo.'),
+    L(`A ${name.en} has ${n(actual).en} sides.`, `Ein ${name.de} hat ${n(actual).de} Seiten.`, `Un ${name.es} tiene ${n(actual).es} lados.`),
     [
-      L('Every rectangle is a square.', 'Jedes Rechteck ist ein Quadrat.', 'Todo rectángulo es un cuadrado.'),
+      L(`A ${name.en} has ${n(actual + copies).en} sides.`, `Ein ${name.de} hat ${n(actual + copies).de} Seiten.`, `Un ${name.es} tiene ${n(actual + copies).es} lados.`),
       L('A triangle can have two right angles.', 'Ein Dreieck kann zwei rechte Winkel haben.', 'Un triángulo puede tener dos ángulos rectos.'),
-      L('A parallelogram cannot be a rectangle.', 'Ein Parallelogramm kann kein Rechteck sein.', 'Un paralelogramo no puede ser un rectángulo.'),
-    ],
+      L('Every rectangle is a triangle.', 'Jedes Rechteck ist ein Dreieck.', 'Todo rectángulo es un triángulo.'),
+    ].slice(0, Math.max(2, Math.min(3, copies))),
     ctx.rng,
   )
   return ask(
@@ -671,8 +680,8 @@ export function g5gB(ctx: Ctx) {
     { type: 'choice', options: pack.options },
     pack.answer,
     [
-      L('Squares have four right angles and opposite sides equal, so they belong inside the rectangles.', 'Quadrate haben vier rechte Winkel und gleiche Gegenseiten, also gehören sie zu den Rechtecken.', 'Los cuadrados tienen cuatro ángulos rectos y lados opuestos iguales, así que viven dentro de los rectángulos.'),
-      L('The other way fails: a long rectangle is not a square.', 'Umgekehrt stimmt es nicht: ein langes Rechteck ist kein Quadrat.', 'Al revés falla: un rectángulo largo no es un cuadrado.'),
+      L(`A ${name.en} has ${n(actual).en} sides.`, `Ein ${name.de} hat ${n(actual).de} Seiten.`, `Un ${name.es} tiene ${n(actual).es} lados.`),
+      L('The other sentences add extra sides or mix the categories.', 'Die anderen Sätze fügen Seiten hinzu oder vermischen die Kategorien.', 'Las otras oraciones agregan lados o mezclan las categorías.'),
     ],
   )
 }

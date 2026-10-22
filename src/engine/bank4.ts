@@ -696,7 +696,8 @@ export function g4mdA(ctx: Ctx) {
 
 export function g4mdB(ctx: Ctx) {
   const labels = ['1/4', '2/4', '3/4', '1']
-  const counts = [ctx.rng.int(0, 5), ctx.rng.int(1, 6), ctx.rng.int(0, 5), ctx.rng.int(1, 4)]
+  const hi = Math.max(2, knobNum(ctx, 'qty', 4))
+  const counts = [ctx.rng.int(0, hi), ctx.rng.int(1, hi + 1), ctx.rng.int(0, hi), ctx.rng.int(1, Math.max(2, hi - 1))]
   const index = ctx.rng.int(0, 3)
   if (ctx.mode === 'sum') {
     const values = [0.25, 0.5, 0.75, 1]
@@ -801,52 +802,63 @@ export function g4mdC(ctx: Ctx) {
 
 export function g4g(ctx: Ctx) {
   if (ctx.mode === 'parallel') {
-    const pack = textChoice(
-      L('trapezoid', 'Trapez', 'trapecio'),
-      [L('scalene triangle', 'ungleichseitiges Dreieck', 'triángulo escaleno'), L('The figure with no straight sides would not, but here choose the one with exactly one pair.', 'Ein Kreis hätte keine, hier aber das mit genau einem Paar.', 'Un círculo no tendría, pero aquí el de exactamente un par.')],
-      ctx.rng,
-    )
-    const better = textChoice(
-      L('It has exactly one pair of parallel sides.', 'Es hat genau ein Paar paralleler Seiten.', 'Tiene exactamente un par de lados paralelos.'),
-      [
-        L('It has no parallel sides.', 'Es hat keine parallelen Seiten.', 'No tiene lados paralelos.'),
-        L('All of its sides are curved.', 'Alle Seiten sind gebogen.', 'Todos sus lados son curvos.'),
-        L('It has three pairs of parallel sides.', 'Es hat drei Paare paralleler Seiten.', 'Tiene tres pares de lados paralelos.'),
-      ],
-      ctx.rng,
-    )
-    void pack
+    const sides = Math.min(6, Math.max(3, knobNum(ctx, 'sides', 4)))
+    const copies = Math.max(1, knobNum(ctx, 'qty', 1))
+    const extra = knobBool(ctx, 'twist', false) ? 1 : 0
+    const each = sides === 4 ? 1 : 0
+    const total = each * copies + extra
+    const shape = sides <= 3 ? 'triangle' as const : sides === 5 ? 'pentagon' as const : sides >= 6 ? 'hexagon' as const : 'trapezoid' as const
     return ask(
       ctx,
-      L('Which sentence describes this trapezoid?', 'Welcher Satz beschreibt dieses Trapez?', '¿Cuál oración describe este trapecio?'),
-      { type: 'choice', options: better.options },
-      better.answer,
+      extra
+        ? L(`There are ${n(copies).en} of these figures, and one extra pair of parallel sides is drawn beside them. How many pairs are there in all?`, `Es gibt ${n(copies).de} dieser Figuren, und ein extra Paar paralleler Seiten wird daneben gezeichnet. Wie viele Paare sind es zusammen?`, `Hay ${n(copies).es} de estas figuras y se dibuja un par extra de lados paralelos al lado. ¿Cuántos pares hay en total?`)
+        : L(`There are ${n(copies).en} of these figures. How many pairs of parallel sides are there in all?`, `Es gibt ${n(copies).de} dieser Figuren. Wie viele Paare paralleler Seiten sind es zusammen?`, `Hay ${n(copies).es} de estas figuras. ¿Cuántos pares de lados paralelos hay en total?`),
+      { type: 'number' },
+      { kind: 'number', value: total },
       [
-        L('A trapezoid has exactly one pair of parallel sides.', 'Ein Trapez hat genau ein Paar paralleler Seiten.', 'Un trapecio tiene exactamente un par de lados paralelos.'),
-        L('The other sentences describe different figures.', 'Die anderen Sätze beschreiben andere Figuren.', 'Las otras oraciones describen figuras distintas.'),
+        L(each ? 'A trapezoid has exactly one pair of parallel sides.' : 'This figure has no parallel sides.', each ? 'Ein Trapez hat genau ein Paar paralleler Seiten.' : 'Diese Figur hat keine parallelen Seiten.', each ? 'Un trapecio tiene exactamente un par de lados paralelos.' : 'Esta figura no tiene lados paralelos.'),
+        L(`${n(copies).en} × ${n(each).en}${extra ? ' + 1' : ''} = ${n(total).en}.`, `${n(copies).de} × ${n(each).de}${extra ? ' + 1' : ''} = ${n(total).de}.`, `${n(copies).es} × ${n(each).es}${extra ? ' + 1' : ''} = ${n(total).es}.`),
       ],
-      { type: 'shape', shape: 'trapezoid' },
+      { type: 'shape', shape },
     )
   }
   if (ctx.mode === 'classify') {
+    const sides = Math.min(6, Math.max(3, knobNum(ctx, 'sides', 4)))
+    const correct = sides === 3 ? L('triangle', 'Dreieck', 'triángulo') : sides === 5 ? L('pentagon', 'Fünfeck', 'pentágono') : sides === 6 ? L('hexagon', 'Sechseck', 'hexágono') : L('rectangle', 'Rechteck', 'rectángulo')
     const pack = textChoice(
-      L('rectangle', 'Rechteck', 'rectángulo'),
-      [L('scalene triangle', 'ungleichseitiges Dreieck', 'triángulo escaleno'), L('pentagon', 'Fünfeck', 'pentágono'), L('A shape with no right angles', 'Eine Figur ohne rechte Winkel', 'Una figura sin ángulos rectos')],
+      correct,
+      [
+        L('rectangle', 'Rechteck', 'rectángulo'),
+        L('triangle', 'Dreieck', 'triángulo'),
+        L('pentagon', 'Fünfeck', 'pentágono'),
+        L('hexagon', 'Sechseck', 'hexágono'),
+        L('A shape with no right angles', 'Eine Figur ohne rechte Winkel', 'Una figura sin ángulos rectos'),
+      ].filter((item) => item.en !== correct.en).slice(0, Math.max(2, Math.min(3, knobNum(ctx, 'qty', 3)))),
       ctx.rng,
     )
     return ask(
       ctx,
-      L('Which figure has four right angles?', 'Welche Figur hat vier rechte Winkel?', '¿Cuál figura tiene cuatro ángulos rectos?'),
+      sides === 4
+        ? L('Which figure has four right angles?', 'Welche Figur hat vier rechte Winkel?', '¿Cuál figura tiene cuatro ángulos rectos?')
+        : L(`Which figure has ${n(sides).en} sides?`, `Welche Figur hat ${n(sides).de} Seiten?`, `¿Cuál figura tiene ${n(sides).es} lados?`),
       { type: 'choice', options: pack.options },
       pack.answer,
-      [
-        L('A rectangle’s corners are all right angles.', 'Die Ecken eines Rechtecks sind alle rechte Winkel.', 'Las esquinas de un rectángulo son todos ángulos rectos.'),
-        L('A square is a special rectangle, and it also qualifies.', 'Ein Quadrat ist ein besonderes Rechteck und zählt ebenfalls.', 'Un cuadrado es un rectángulo especial y también cuenta.'),
-      ],
+      sides === 4
+        ? [
+            L('A rectangle’s corners are all right angles.', 'Die Ecken eines Rechtecks sind alle rechte Winkel.', 'Las esquinas de un rectángulo son todos ángulos rectos.'),
+            L('A square is a special rectangle, and it also qualifies.', 'Ein Quadrat ist ein besonderes Rechteck und zählt ebenfalls.', 'Un cuadrado es un rectángulo especial y también cuenta.'),
+          ]
+        : [
+            L(`Count the sides. The figure has ${n(sides).en}.`, `Zähle die Seiten. Die Figur hat ${n(sides).de}.`, `Cuenta los lados. La figura tiene ${n(sides).es}.`),
+            L(`The name is ${correct.en}.`, `Der Name ist ${correct.de}.`, `El nombre es ${correct.es}.`),
+          ],
     )
   }
   const pool = knobBool(ctx, 'allShapes', ctx.difficulty >= 3) ? SYMMETRY : SYMMETRY.slice(0, 4)
-  const item = ctx.rng.pick(pool)
+  const want = knobNum(ctx, 'sides', 4)
+  const ranked = [...pool].sort((a, b) => Math.abs(a.lines - want) - Math.abs(b.lines - want))
+  const slot = Math.min(ranked.length - 1, Math.max(0, knobNum(ctx, 'qty', 1) - 1))
+  const item = knobBool(ctx, 'twist', false) ? ranked[ranked.length - 1 - slot] ?? ranked[0] : ranked[slot] ?? ctx.rng.pick(pool)
   return ask(
     ctx,
     L('How many lines of symmetry does this figure have?', 'Wie viele Symmetrieachsen hat diese Figur?', '¿Cuántos ejes de simetría tiene esta figura?'),

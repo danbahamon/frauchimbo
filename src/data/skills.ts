@@ -85,7 +85,74 @@ export const DOMAIN_COLOR: Record<DomainId, string> = {
   SP: '#b86e00',
 }
 
-export const SKILLS: Skill[] = [
+function isSquare(knob: Knob) {
+  return knob.kind === 'select' && knob.id !== 'mode' && knob.id !== 'place' && knob.options.length >= 2 && knob.options.length <= 8
+}
+
+// Every unit the student can select should have at least three settings that change the question.
+function deepen(skill: Skill): Skill {
+  const extras: Knob[] = []
+  const has = (id: string) => skill.knobs.some((knob) => knob.id === id) || extras.some((knob) => knob.id === id)
+  const sizeIds = ['max', 'digits', 'within', 'den', 'by', 'top', 'span', 'whole', 'radius', 'size', 'cells', 'sides', 'reach', 'charts', 'count']
+  if (!skill.knobs.some((knob) => sizeIds.includes(knob.id))) {
+    if (skill.domain === 'G') {
+      extras.push(range('sides', L('Number of sides', 'Anzahl der Seiten', 'Número de lados'), L('How many sides the shape uses.', 'Wie viele Seiten die Figur hat.', 'Cuántos lados usa la figura.'), 3, 8, [3, 4, 4, 6, 8]))
+    } else if (skill.domain === 'SP') {
+      extras.push(range('charts', L('How many charts', 'Wie viele Diagramme', 'Cuántos gráficos'), L('How many charts or groups the question shows.', 'Wie viele Diagramme oder Gruppen die Aufgabe zeigt.', 'Cuántos gráficos o grupos muestra la pregunta.'), 1, 4, [1, 1, 2, 3, 4]))
+    } else if (skill.domain === 'MD') {
+      extras.push(range('reach', L('Largest measure', 'Größtes Maß', 'Medida mayor'), L('How large a measure in the question can be.', 'Wie groß ein Maß in der Aufgabe sein kann.', 'Qué tan grande puede ser una medida en la pregunta.'), 6, 60, [8, 12, 20, 36, 48]))
+    } else {
+      extras.push(range('reach', L('Largest number', 'Größte Zahl', 'Número mayor'), L('The biggest number a question can use.', 'Die größte Zahl, die eine Aufgabe nutzt.', 'El número más grande que usa una pregunta.'), 6, 80, [8, 12, 24, 40, 60]))
+    }
+  }
+  if (!has('qty')) {
+    const label = skill.domain === 'G'
+      ? L('How many shapes', 'Wie viele Figuren', 'Cuántas figuras')
+      : skill.domain === 'SP'
+        ? L('How many values', 'Wie viele Werte', 'Cuántos datos')
+        : skill.domain === 'NF'
+          ? L('How many fractions', 'Wie viele Brüche', 'Cuántas fracciones')
+          : skill.domain === 'MD'
+            ? L('How many measures', 'Wie viele Maße', 'Cuántas medidas')
+            : L('How many numbers', 'Wie viele Zahlen', 'Cuántos números')
+    const min = skill.domain === 'SP' ? 4 : skill.domain === 'G' ? 1 : 2
+    const max = skill.domain === 'SP' ? 12 : skill.domain === 'G' ? 4 : 6
+    const levels: Levels<number> = skill.domain === 'SP' ? [4, 5, 6, 8, 10] : skill.domain === 'G' ? [1, 1, 2, 3, 4] : [2, 3, 3, 4, 5]
+    extras.push(range('qty', label, L('How many numbers or pieces appear in one question.', 'Wie viele Zahlen oder Teile in einer Aufgabe stehen.', 'Cuántos números o partes aparecen en una pregunta.'), min, max, levels))
+  }
+  if (!has('twist')) {
+    extras.push(toggle('twist', L('An extra step', 'Ein Schritt mehr', 'Un paso más'), L('The question takes one more step to finish.', 'Die Aufgabe braucht einen Schritt mehr.', 'La pregunta pide un paso más.'), [false, false, true, true, true]))
+  }
+  const all = [...skill.knobs, ...extras]
+  const shown = (values: Record<string, string>) => all.filter((knob) => {
+    if (knob.id === 'mode' || isSquare(knob)) return false
+    if (!knob.when) return true
+    return knob.when.in.includes(String(values[knob.when.id] ?? ''))
+  }).length
+  const modeKnob = skill.knobs.find((knob) => knob.id === 'mode' && knob.kind === 'select')
+  const modes = modeKnob && modeKnob.kind === 'select' ? modeKnob.options.map((option) => option.value) : ['']
+  const branches = skill.knobs.filter(isSquare)
+  let short = false
+  for (const mode of modes) {
+    const active = branches.filter((knob) => !knob.when || knob.when.in.includes(mode))
+    if (!active.length) {
+      if (shown({ mode }) < 3) short = true
+    } else {
+      for (const item of active) {
+        if (item.kind !== 'select') continue
+        for (const option of item.options) {
+          if (shown({ mode, [item.id]: option.value }) < 3) short = true
+        }
+      }
+    }
+  }
+  if (short && !has('mix')) {
+    extras.push(toggle('mix', L('A harder mix', 'Eine schwerere Mischung', 'Una mezcla más difícil'), L('Use a wider mix of the numbers in the question.', 'Nutze eine breitere Mischung der Zahlen.', 'Usa una mezcla más amplia de los números.'), [false, false, true, true, true]))
+  }
+  return extras.length ? { ...skill, knobs: [...skill.knobs, ...extras] } : skill
+}
+
+const RAW_SKILLS: Skill[] = [
   skill({
     id: '3.oa.a',
     grade: 3,
@@ -1352,6 +1419,8 @@ export const SKILLS: Skill[] = [
     ],
   }),
 ]
+
+export const SKILLS: Skill[] = RAW_SKILLS.map(deepen)
 
 export function getSkill(id: string) {
   return SKILLS.find((item) => item.id === id)

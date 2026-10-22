@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { ActiveTest, Attempt, Blueprint, Locale, Profile, Route, TestRecord } from './lib/types'
+import type { ActiveTest, Attempt, Blueprint, Locale, Pin, Profile, Route, TestRecord } from './lib/types'
+import { getSkill } from './data/skills'
+import { identityKnobs, unitKey } from './lib/units'
 import { decodeShare } from './lib/i18n'
 import { emptyState, loadState, saveState, type Persisted } from './lib/storage'
 import { uid } from './lib/math'
@@ -20,6 +22,7 @@ interface Store {
   setProfile: (profile: Profile) => void
   patchProfile: (patch: Partial<Profile>) => void
   logAttempt: (attempt: Omit<Attempt, 'id' | 'at'>) => void
+  togglePin: (pin: Pin) => void
   setActive: (active: ActiveTest | null) => void
   patchActive: (patch: Partial<ActiveTest>) => void
   saveTest: (test: TestRecord) => void
@@ -84,6 +87,15 @@ export function Provider({ children }: { children: ReactNode }) {
           ...current,
           attempts: [...current.attempts, { ...attempt, id: uid('a'), at: Date.now() }].slice(-2000),
         })),
+      togglePin: (pin) =>
+        setData((current) => {
+          const pins = current.pins ?? []
+          const skill = getSkill(pin.skillId)
+          const key = unitKey(pin.skillId, pin.knobs, skill)
+          const has = pins.some((item) => unitKey(item.skillId, item.knobs, getSkill(item.skillId)) === key)
+          const next = skill ? { skillId: pin.skillId, knobs: identityKnobs(skill, pin.knobs) } : pin
+          return { ...current, pins: has ? pins.filter((item) => unitKey(item.skillId, item.knobs, getSkill(item.skillId)) !== key) : [...pins, next] }
+        }),
       setActive: (active) => setData((current) => ({ ...current, active })),
       patchActive: (patch) =>
         setData((current) => ({ ...current, active: current.active ? { ...current.active, ...patch } : current.active })),
@@ -100,7 +112,7 @@ export function Provider({ children }: { children: ReactNode }) {
         })),
       replaceAll: (next) => setData(next),
       resetProgress: () =>
-        setData((current) => ({ ...current, attempts: [], tests: [], active: null, route: { name: 'home' } })),
+        setData((current) => ({ ...current, attempts: [], tests: [], active: null, pins: [], route: { name: 'home' } })),
       flash: (message) => {
         setNotice(message)
         window.setTimeout(() => setNotice((current) => (current === message ? null : current)), 2800)
