@@ -774,7 +774,6 @@ h2 { font-size: 1.45rem; margin: 0 0 8px; overflow-wrap: break-word; }
 /* ---------- Studio pass: components ---------- */
 @property --p { syntax: '<percentage>'; inherits: false; initial-value: 0%; }
 @keyframes fill-ring { from { --p: 0%; } }
-@keyframes bob { 50% { transform: translateY(-6px) rotate(-2deg); } }
 @keyframes shine { 60%, 100% { transform: translateX(100%); } }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 14px) scale(0.98); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
 @keyframes streak-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
@@ -797,8 +796,8 @@ h2 { font-size: 1.45rem; margin: 0 0 8px; overflow-wrap: break-word; }
 }
 .hero-copy { min-width: 0; }
 .hero-copy h1 { margin: 4px 0 6px; }
-.hero-mascot { flex: none; animation: bob 4.2s ease-in-out infinite; }
-.hero-mascot .mascot { display: block; filter: drop-shadow(0 10px 14px rgba(70, 42, 18, 0.18)); }
+.hero-mascot { flex: none; }
+.hero-mascot .mascot { display: block; }
 @media (max-width: 560px) {
   .hero-card { gap: 12px; padding: 16px; }
   .hero-mascot .mascot { width: 56px; height: 56px; }
@@ -960,9 +959,69 @@ h2 { font-size: 1.45rem; margin: 0 0 8px; overflow-wrap: break-word; }
 @keyframes ripple { from { transform: scale(.6); opacity: .9; } to { transform: scale(2.6); opacity: 0; } }
 .plane-cross { stroke: #e25b45; stroke-width: 1.4; stroke-dasharray: 4 4; opacity: .6; }
 
-/* The snail blinks now and then. Only the eyes move, so the face stays readable. */
-.mascot .snail-eye { transform-box: fill-box; transform-origin: center; animation: snail-blink 5.5s ease-in-out infinite; }
-@keyframes snail-blink { 0%, 92%, 100% { transform: scaleY(1); } 95.5% { transform: scaleY(0.1); } }
+/* The snail floats, the eyestalks sway, and the idle face blinks. */
+.mascot {
+  position: relative;
+  display: inline-block;
+  width: var(--mascot, 72px);
+  height: var(--mascot, 72px);
+  flex: none;
+  line-height: 0;
+  vertical-align: middle;
+}
+.snail-pop, .snail-rig { display: block; width: 100%; height: 100%; }
+.snail-pop { animation: snail-arrive .42s cubic-bezier(.2, 1.3, .3, 1); }
+.snail-rig {
+  position: relative;
+  transform-origin: 50% 88%;
+  filter: drop-shadow(0 10px 12px rgba(70, 42, 18, 0.16));
+  animation: snail-float 4.2s ease-in-out infinite;
+}
+.mascot[data-mood='joy'] .snail-rig { animation: snail-cheer 1.7s ease-in-out infinite; }
+.mascot[data-mood='think'] .snail-rig { animation: snail-ponder 3.4s ease-in-out infinite; }
+.snail-part {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+}
+.snail-ant { transform-origin: 50% 30%; animation: ant-sway 2.8s ease-in-out infinite; }
+.snail-ant.alt { animation: ant-sway-alt 3.3s ease-in-out infinite; }
+.mascot[data-mood='joy'] .snail-ant { animation-duration: 1.15s; }
+.mascot[data-mood='joy'] .snail-ant.alt { animation-duration: 1.35s; }
+.mascot[data-mood='think'] .snail-ant { animation-name: ant-ponder; animation-duration: 4.4s; }
+.mascot[data-mood='think'] .snail-ant.alt { animation-name: ant-ponder-alt; animation-duration: 4.9s; }
+.snail-lid {
+  position: absolute;
+  border-radius: 50%;
+  background: linear-gradient(#fedca0 62%, #6a3a22 62% 78%, #fedca0 78%);
+  transform-origin: 50% 0%;
+  transform: scaleY(0);
+  animation: snail-lid 5.6s ease-in-out infinite;
+  pointer-events: none;
+}
+.snail-lid:last-of-type { animation-delay: .06s; }
+@keyframes snail-arrive { from { transform: scale(.84) translateY(8%); } }
+@keyframes snail-float {
+  0%, 100% { transform: translateY(0) rotate(-1.2deg); }
+  50% { transform: translateY(-5%) rotate(1.5deg); }
+}
+@keyframes snail-cheer {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  45% { transform: translateY(-8%) rotate(4deg); }
+}
+@keyframes snail-ponder {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-2.5%) rotate(5deg); }
+}
+@keyframes ant-sway { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(8deg); } }
+@keyframes ant-sway-alt { 0%, 100% { transform: rotate(7deg); } 50% { transform: rotate(-8deg); } }
+@keyframes ant-ponder { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(4deg); } }
+@keyframes ant-ponder-alt { 0%, 100% { transform: rotate(4deg); } 50% { transform: rotate(-3deg); } }
+@keyframes snail-lid { 0%, 88%, 100% { transform: scaleY(0); } 93.5% { transform: scaleY(1); } }
 
 /* ---------- Variables: what a problem type can change ---------- */
 .variables { display: grid; gap: 12px; }
