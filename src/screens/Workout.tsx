@@ -4,6 +4,7 @@ import { positionDifficulty } from '../lib/math'
 import { heatFor, knobsForPath, identityPath, unitKey, unitTitle, unitVariant } from '../lib/units'
 import { useStore } from '../state'
 import { Icon } from '../components/Icon'
+import { WorkoutStats } from '../components/WorkoutStats'
 
 export function Workout() {
   const { locale, data, setRoute, togglePin } = useStore()
@@ -15,7 +16,9 @@ export function Workout() {
       <p className="kicker">{t(locale, 'nav.workout')}</p>
       <h1>{t(locale, 'work.title')}</h1>
       <p className="muted">{t(locale, 'work.sub')}</p>
-      <p className="fine">{t(locale, 'work.legend')}</p>
+      <WorkoutStats />
+      <h2 className="wk-pins">{t(locale, 'work.pins')}</h2>
+      <p className="fine wk-legend">{t(locale, 'work.legend')}</p>
       {pins.length === 0 ? <p className="muted" style={{ marginTop: 16 }}>{t(locale, 'work.empty')}</p> : null}
       <div className="catalog">
         {pins.map((pin) => {
