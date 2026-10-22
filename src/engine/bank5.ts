@@ -1,66 +1,163 @@
 import { roundHalfUp, roundTo } from '../lib/math'
-import { ask, expression, frac, knobBool, knobFlag, knobNum, L, n, scene, textChoice, type Ctx } from './shared'
-import { fractionQuestion, g4mdA, g4nbtB, reducedMixed } from './bank4'
+import { ask, densUpTo, expression, frac, knobBool, knobFlag, knobNum, knobStr, L, n, scene, shuffleNotSorted, textChoice, type Ctx } from './shared'
+import type { Localized } from '../lib/types'
+import { fractionQuestion, chosenRoundPlace, g4mdA, g4nbtB, placeColumns, reducedMixed, roundPhrase } from './bank4'
 import { avoidTie } from './ops'
 
+function span(ctx: Ctx, lo: number, hi: number) {
+  const low = Math.min(lo, hi)
+  const high = Math.max(lo, hi)
+  return ctx.rng.int(low, high)
+}
+
+function exprText(pieces: Array<{ t: 'v'; value: number } | { t: 'op'; v: string }>) {
+  const text = (loc: 'en' | 'de' | 'es') => pieces.map((piece) => (piece.t === 'v' ? n(piece.value)[loc] : piece.v)).join(' ')
+  return L(text('en'), text('de'), text('es'))
+}
+
 export function g5oaA(ctx: Ctx) {
-  const top = knobNum(ctx, 'max', 9)
-  const a = ctx.rng.int(2, top)
-  const b = ctx.rng.int(2, top - 1)
-  const c = ctx.rng.int(2, top - 3)
-  if (ctx.mode === 'words') {
-    const pack = textChoice(
-      L(`(${n(a).en} + ${n(b).en}) × ${n(c).en}`, `(${n(a).de} + ${n(b).de}) × ${n(c).de}`, `(${n(a).es} + ${n(b).es}) × ${n(c).es}`),
-      [
-        L(`${n(a).en} + ${n(b).en} × ${n(c).en}`, `${n(a).de} + ${n(b).de} × ${n(c).de}`, `${n(a).es} + ${n(b).es} × ${n(c).es}`),
-        L(`${n(a).en} × ${n(b).en} + ${n(c).en}`, `${n(a).de} × ${n(b).de} + ${n(c).de}`, `${n(a).es} × ${n(b).es} + ${n(c).es}`),
-        L(`(${n(a).en} × ${n(b).en}) + ${n(c).en}`, `(${n(a).de} × ${n(b).de}) + ${n(c).de}`, `(${n(a).es} × ${n(b).es}) + ${n(c).es}`),
-      ],
-      ctx.rng,
-    )
-    return ask(
-      ctx,
-      L(
-        `Which expression means: add ${n(a).en} and ${n(b).en}, then multiply by ${n(c).en}?`,
-        `Welcher Term bedeutet: addiere ${n(a).de} und ${n(b).de}, dann multipliziere mit ${n(c).de}?`,
-        `¿Cuál expresión significa: suma ${n(a).es} y ${n(b).es}, luego multiplica por ${n(c).es}?`,
-      ),
-      { type: 'choice', options: pack.options },
-      pack.answer,
-      [
-        L('The phrase “then” means the addition happens before the multiplication, so it needs parentheses.', 'Das Wort „dann“ heißt: die Addition geschieht vor der Multiplikation, also braucht sie Klammern.', 'La palabra “luego” dice que la suma ocurre antes de la multiplicación, así que necesita paréntesis.'),
-        L(`Without parentheses, multiplication would happen first.`, `Ohne Klammern geschähe die Multiplikation zuerst.`, `Sin paréntesis, la multiplicación ocurriría primero.`),
-      ],
-    )
-  }
-  const grouped = ctx.rng.chance(0.55)
-  const value = grouped ? (a + b) * c : a + b * c
-  return ask(
-    ctx,
-    L('Evaluate the expression.', 'Werte den Term aus.', 'Evalúa la expresión.'),
-    { type: 'number' },
-    { kind: 'number', value },
-    grouped
+  const top = Math.max(4, knobNum(ctx, 'max', 12))
+  const shape = knobStr(ctx, 'shape', 'sumprod')
+  const cCap = Math.max(2, Math.min(top, shape === 'three' ? 15 : top))
+  const a = span(ctx, 2, top)
+  const b = span(ctx, 2, top)
+  const c = span(ctx, 2, cCap)
+  if (shape === 'div') {
+    const divisor = span(ctx, 2, Math.max(2, Math.min(12, top)))
+    const parts = span(ctx, 2, Math.max(2, Math.min(top, 40)))
+    const sum = divisor * parts
+    const left = span(ctx, 1, Math.max(1, sum - 1))
+    const right = sum - left
+    const grouped = ctx.mode === 'words' || ctx.rng.chance(0.55)
+    const loose = divisor * span(ctx, 2, Math.max(2, Math.floor(top / divisor) || 2))
+    const head = span(ctx, 2, top)
+    const value = grouped ? parts : head + loose / divisor
+    const pieces = grouped
+      ? [{ t: 'op' as const, v: '(' }, { t: 'v' as const, value: left }, { t: 'op' as const, v: '+' }, { t: 'v' as const, value: right }, { t: 'op' as const, v: ')' }, { t: 'op' as const, v: '÷' }, { t: 'v' as const, value: divisor }]
+      : [{ t: 'v' as const, value: head }, { t: 'op' as const, v: '+' }, { t: 'v' as const, value: loose }, { t: 'op' as const, v: '÷' }, { t: 'v' as const, value: divisor }]
+    const steps = grouped
       ? [
-          L(`Parentheses first: ${n(a).en} + ${n(b).en} = ${n(a + b).en}.`, `Zuerst die Klammern: ${n(a).de} + ${n(b).de} = ${n(a + b).de}.`, `Primero los paréntesis: ${n(a).es} + ${n(b).es} = ${n(a + b).es}.`),
-          L(`${n(a + b).en} × ${n(c).en} = ${n(value).en}.`, `${n(a + b).de} × ${n(c).de} = ${n(value).de}.`, `${n(a + b).es} × ${n(c).es} = ${n(value).es}.`),
+          L(`Parentheses first: ${n(left).en} + ${n(right).en} = ${n(sum).en}.`, `Zuerst die Klammern: ${n(left).de} + ${n(right).de} = ${n(sum).de}.`, `Primero los paréntesis: ${n(left).es} + ${n(right).es} = ${n(sum).es}.`),
+          L(`${n(sum).en} ÷ ${n(divisor).en} = ${n(parts).en}.`, `${n(sum).de} ÷ ${n(divisor).de} = ${n(parts).de}.`, `${n(sum).es} ÷ ${n(divisor).es} = ${n(parts).es}.`),
         ]
       : [
-          L(`Multiplication happens before addition: ${n(b).en} × ${n(c).en} = ${n(b * c).en}.`, `Die Multiplikation geschieht vor der Addition: ${n(b).de} × ${n(c).de} = ${n(b * c).de}.`, `La multiplicación ocurre antes de la suma: ${n(b).es} × ${n(c).es} = ${n(b * c).es}.`),
-          L(`${n(a).en} + ${n(b * c).en} = ${n(value).en}.`, `${n(a).de} + ${n(b * c).de} = ${n(value).de}.`, `${n(a).es} + ${n(b * c).es} = ${n(value).es}.`),
-        ],
-    expression(
-      grouped
-        ? [{ t: 'op', v: '(' }, { t: 'v', value: a }, { t: 'op', v: '+' }, { t: 'v', value: b }, { t: 'op', v: ')' }, { t: 'op', v: '×' }, { t: 'v', value: c }]
-        : [{ t: 'v', value: a }, { t: 'op', v: '+' }, { t: 'v', value: b }, { t: 'op', v: '×' }, { t: 'v', value: c }],
-    ),
-  )
+          L(`Division happens before addition: ${n(loose).en} ÷ ${n(divisor).en} = ${n(loose / divisor).en}.`, `Die Division geschieht vor der Addition: ${n(loose).de} ÷ ${n(divisor).de} = ${n(loose / divisor).de}.`, `La división ocurre antes de la suma: ${n(loose).es} ÷ ${n(divisor).es} = ${n(loose / divisor).es}.`),
+          L(`${n(head).en} + ${n(loose / divisor).en} = ${n(value).en}.`, `${n(head).de} + ${n(loose / divisor).de} = ${n(value).de}.`, `${n(head).es} + ${n(loose / divisor).es} = ${n(value).es}.`),
+        ]
+    if (ctx.mode === 'words') {
+      const correct = exprText(pieces)
+      const pack = textChoice(correct, [
+        exprText([{ t: 'v', value: left }, { t: 'op', v: '+' }, { t: 'v', value: right }, { t: 'op', v: '÷' }, { t: 'v', value: divisor }]),
+        exprText([{ t: 'op', v: '(' }, { t: 'v', value: left }, { t: 'op', v: '×' }, { t: 'v', value: right }, { t: 'op', v: ')' }, { t: 'op', v: '÷' }, { t: 'v', value: divisor }]),
+        exprText([{ t: 'v', value: left }, { t: 'op', v: '÷' }, { t: 'v', value: right }, { t: 'op', v: '+' }, { t: 'v', value: divisor }]),
+      ], ctx.rng)
+      return ask(ctx, L(
+        `Which expression means: add ${n(left).en} and ${n(right).en}, then divide by ${n(divisor).en}?`,
+        `Welcher Term bedeutet: addiere ${n(left).de} und ${n(right).de}, dann teile durch ${n(divisor).de}?`,
+        `¿Cuál expresión significa: suma ${n(left).es} y ${n(right).es}, luego divide entre ${n(divisor).es}?`,
+      ), { type: 'choice', options: pack.options }, pack.answer, steps)
+    }
+    return ask(ctx, L('Evaluate the expression.', 'Werte den Term aus.', 'Evalúa la expresión.'), { type: 'number' }, { kind: 'number', value }, steps, expression(pieces))
+  }
+  if (shape === 'three') {
+    const factor = span(ctx, 2, Math.max(2, Math.min(top, 12)))
+    const grouped = ctx.mode === 'words' || ctx.rng.chance(0.55)
+    const product = grouped ? (a + b) * factor : a + b * factor
+    const take = span(ctx, 1, Math.max(1, Math.min(top, product)))
+    const value = product - take
+    const pieces = grouped
+      ? [{ t: 'op' as const, v: '(' }, { t: 'v' as const, value: a }, { t: 'op' as const, v: '+' }, { t: 'v' as const, value: b }, { t: 'op' as const, v: ')' }, { t: 'op' as const, v: '×' }, { t: 'v' as const, value: factor }, { t: 'op' as const, v: '−' }, { t: 'v' as const, value: take }]
+      : [{ t: 'v' as const, value: a }, { t: 'op' as const, v: '+' }, { t: 'v' as const, value: b }, { t: 'op' as const, v: '×' }, { t: 'v' as const, value: factor }, { t: 'op' as const, v: '−' }, { t: 'v' as const, value: take }]
+    const steps = [
+      L(grouped ? `Parentheses first, then multiply: ${n(product).en}.` : `Multiply before you add: ${n(b).en} × ${n(factor).en} = ${n(b * factor).en}.`, grouped ? `Zuerst die Klammern, dann malnehmen: ${n(product).de}.` : `Erst multiplizieren: ${n(b).de} × ${n(factor).de} = ${n(b * factor).de}.`, grouped ? `Primero los paréntesis, luego multiplica: ${n(product).es}.` : `Primero multiplica: ${n(b).es} × ${n(factor).es} = ${n(b * factor).es}.`),
+      L(`Then subtract ${n(take).en}: ${n(value).en}.`, `Dann subtrahiere ${n(take).de}: ${n(value).de}.`, `Luego resta ${n(take).es}: ${n(value).es}.`),
+    ]
+    if (ctx.mode === 'words') {
+      const correct = exprText(pieces)
+      const pack = textChoice(correct, [
+        exprText([{ t: 'v', value: a }, { t: 'op', v: '+' }, { t: 'v', value: b }, { t: 'op', v: '×' }, { t: 'v', value: factor }, { t: 'op', v: '−' }, { t: 'v', value: take }]),
+        exprText([{ t: 'v', value: a }, { t: 'op', v: '×' }, { t: 'v', value: b }, { t: 'op', v: '+' }, { t: 'v', value: factor }, { t: 'op', v: '−' }, { t: 'v', value: take }]),
+        exprText([{ t: 'op', v: '(' }, { t: 'v', value: a }, { t: 'op', v: '+' }, { t: 'v', value: b }, { t: 'op', v: '×' }, { t: 'v', value: factor }, { t: 'op', v: ')' }, { t: 'op', v: '−' }, { t: 'v', value: take }]),
+      ], ctx.rng)
+      return ask(ctx, L(
+        `Which expression means: add ${n(a).en} and ${n(b).en}, multiply by ${n(factor).en}, then subtract ${n(take).en}?`,
+        `Welcher Term bedeutet: addiere ${n(a).de} und ${n(b).de}, multipliziere mit ${n(factor).de}, dann subtrahiere ${n(take).de}?`,
+        `¿Cuál expresión significa: suma ${n(a).es} y ${n(b).es}, multiplica por ${n(factor).es} y luego resta ${n(take).es}?`,
+      ), { type: 'choice', options: pack.options }, pack.answer, steps)
+    }
+    return ask(ctx, L('Evaluate the expression.', 'Werte den Term aus.', 'Evalúa la expresión.'), { type: 'number' }, { kind: 'number', value }, steps, expression(pieces))
+  }
+  if (shape === 'diff') {
+    const factor = span(ctx, 2, Math.max(2, Math.min(top, 20)))
+    const small = span(ctx, 2, top)
+    const large = small + span(ctx, 1, top)
+    const grouped = ctx.mode === 'words' || ctx.rng.chance(0.55)
+    const product = small * factor
+    const head = product + span(ctx, 0, top)
+    const value = grouped ? (large - small) * factor : head - product
+    const pieces = grouped
+      ? [{ t: 'op' as const, v: '(' }, { t: 'v' as const, value: large }, { t: 'op' as const, v: '−' }, { t: 'v' as const, value: small }, { t: 'op' as const, v: ')' }, { t: 'op' as const, v: '×' }, { t: 'v' as const, value: factor }]
+      : [{ t: 'v' as const, value: head }, { t: 'op' as const, v: '−' }, { t: 'v' as const, value: small }, { t: 'op' as const, v: '×' }, { t: 'v' as const, value: factor }]
+    const steps = grouped
+      ? [
+          L(`Parentheses first: ${n(large).en} − ${n(small).en} = ${n(large - small).en}.`, `Zuerst die Klammern: ${n(large).de} − ${n(small).de} = ${n(large - small).de}.`, `Primero los paréntesis: ${n(large).es} − ${n(small).es} = ${n(large - small).es}.`),
+          L(`${n(large - small).en} × ${n(factor).en} = ${n(value).en}.`, `${n(large - small).de} × ${n(factor).de} = ${n(value).de}.`, `${n(large - small).es} × ${n(factor).es} = ${n(value).es}.`),
+        ]
+      : [
+          L(`Multiply first: ${n(small).en} × ${n(factor).en} = ${n(product).en}.`, `Zuerst malnehmen: ${n(small).de} × ${n(factor).de} = ${n(product).de}.`, `Primero multiplica: ${n(small).es} × ${n(factor).es} = ${n(product).es}.`),
+          L(`${n(head).en} − ${n(product).en} = ${n(value).en}.`, `${n(head).de} − ${n(product).de} = ${n(value).de}.`, `${n(head).es} − ${n(product).es} = ${n(value).es}.`),
+        ]
+    if (ctx.mode === 'words') {
+      const correct = exprText(pieces)
+      const pack = textChoice(correct, [
+        exprText([{ t: 'v', value: large }, { t: 'op', v: '−' }, { t: 'v', value: small }, { t: 'op', v: '×' }, { t: 'v', value: factor }]),
+        exprText([{ t: 'v', value: large }, { t: 'op', v: '×' }, { t: 'v', value: small }, { t: 'op', v: '−' }, { t: 'v', value: factor }]),
+        exprText([{ t: 'op', v: '(' }, { t: 'v', value: large }, { t: 'op', v: '×' }, { t: 'v', value: small }, { t: 'op', v: ')' }, { t: 'op', v: '−' }, { t: 'v', value: factor }]),
+      ], ctx.rng)
+      return ask(ctx, L(
+        `Which expression means: subtract ${n(small).en} from ${n(large).en}, then multiply by ${n(factor).en}?`,
+        `Welcher Term bedeutet: subtrahiere ${n(small).de} von ${n(large).de}, dann multipliziere mit ${n(factor).de}?`,
+        `¿Cuál expresión significa: resta ${n(small).es} de ${n(large).es} y luego multiplica por ${n(factor).es}?`,
+      ), { type: 'choice', options: pack.options }, pack.answer, steps)
+    }
+    return ask(ctx, L('Evaluate the expression.', 'Werte den Term aus.', 'Evalúa la expresión.'), { type: 'number' }, { kind: 'number', value }, steps, expression(pieces))
+  }
+  const grouped = ctx.mode === 'words' || ctx.rng.chance(0.55)
+  const value = grouped ? (a + b) * c : a + b * c
+  const pieces = grouped
+    ? [{ t: 'op' as const, v: '(' }, { t: 'v' as const, value: a }, { t: 'op' as const, v: '+' }, { t: 'v' as const, value: b }, { t: 'op' as const, v: ')' }, { t: 'op' as const, v: '×' }, { t: 'v' as const, value: c }]
+    : [{ t: 'v' as const, value: a }, { t: 'op' as const, v: '+' }, { t: 'v' as const, value: b }, { t: 'op' as const, v: '×' }, { t: 'v' as const, value: c }]
+  const steps = grouped
+    ? [
+        L(`Parentheses first: ${n(a).en} + ${n(b).en} = ${n(a + b).en}.`, `Zuerst die Klammern: ${n(a).de} + ${n(b).de} = ${n(a + b).de}.`, `Primero los paréntesis: ${n(a).es} + ${n(b).es} = ${n(a + b).es}.`),
+        L(`${n(a + b).en} × ${n(c).en} = ${n(value).en}.`, `${n(a + b).de} × ${n(c).de} = ${n(value).de}.`, `${n(a + b).es} × ${n(c).es} = ${n(value).es}.`),
+      ]
+    : [
+        L(`Multiplication happens before addition: ${n(b).en} × ${n(c).en} = ${n(b * c).en}.`, `Die Multiplikation geschieht vor der Addition: ${n(b).de} × ${n(c).de} = ${n(b * c).de}.`, `La multiplicación ocurre antes de la suma: ${n(b).es} × ${n(c).es} = ${n(b * c).es}.`),
+        L(`${n(a).en} + ${n(b * c).en} = ${n(value).en}.`, `${n(a).de} + ${n(b * c).de} = ${n(value).de}.`, `${n(a).es} + ${n(b * c).es} = ${n(value).es}.`),
+      ]
+  if (ctx.mode === 'words') {
+    const pack = textChoice(exprText(pieces), [
+      exprText([{ t: 'v', value: a }, { t: 'op', v: '+' }, { t: 'v', value: b }, { t: 'op', v: '×' }, { t: 'v', value: c }]),
+      exprText([{ t: 'v', value: a }, { t: 'op', v: '×' }, { t: 'v', value: b }, { t: 'op', v: '+' }, { t: 'v', value: c }]),
+      exprText([{ t: 'op', v: '(' }, { t: 'v', value: a }, { t: 'op', v: '×' }, { t: 'v', value: b }, { t: 'op', v: ')' }, { t: 'op', v: '+' }, { t: 'v', value: c }]),
+    ], ctx.rng)
+    return ask(ctx, L(
+      `Which expression means: add ${n(a).en} and ${n(b).en}, then multiply by ${n(c).en}?`,
+      `Welcher Term bedeutet: addiere ${n(a).de} und ${n(b).de}, dann multipliziere mit ${n(c).de}?`,
+      `¿Cuál expresión significa: suma ${n(a).es} y ${n(b).es}, luego multiplica por ${n(c).es}?`,
+    ), { type: 'choice', options: pack.options }, pack.answer, [
+      L('The phrase “then” means the addition happens before the multiplication, so it needs parentheses.', 'Das Wort „dann“ heißt: die Addition geschieht vor der Multiplikation, also braucht sie Klammern.', 'La palabra “luego” dice que la suma ocurre antes de la multiplicación, así que necesita paréntesis.'),
+      L('Without parentheses, multiplication would happen first.', 'Ohne Klammern geschähe die Multiplikation zuerst.', 'Sin paréntesis, la multiplicación ocurriría primero.'),
+    ])
+  }
+  return ask(ctx, L('Evaluate the expression.', 'Werte den Term aus.', 'Evalúa la expresión.'), { type: 'number' }, { kind: 'number', value }, steps, expression(pieces))
 }
 
 export function g5oaB(ctx: Ctx) {
-  const stepA = ctx.rng.int(2, knobNum(ctx, 'max', 6))
+  const stepA = ctx.rng.int(2, Math.max(2, knobNum(ctx, 'max', 6)))
   const stepB = stepA * ctx.rng.int(2, 3)
-  const term = ctx.rng.int(3, 6)
+  const term = ctx.rng.int(3, Math.max(3, knobNum(ctx, 'term', 6)))
   const a = stepA * term
   const b = stepB * term
   return ask(
@@ -82,7 +179,7 @@ export function g5oaB(ctx: Ctx) {
 export function g5nbtA(ctx: Ctx) {
   if (ctx.mode === 'compare') {
     // The decimal places come from the variable: 2 gives hundredths (1.25), 1 gives tenths (1.2).
-    const places = Math.min(3, Math.max(1, knobNum(ctx, 'decimals', 2)))
+    const places = Math.min(4, Math.max(1, knobNum(ctx, 'decimals', 2)))
     const scale = 10 ** places
     const a = roundTo(ctx.rng.int(scale, 10 * scale - 1) / scale, places)
     let b = roundTo(ctx.rng.int(scale, 10 * scale - 1) / scale, places)
@@ -100,8 +197,9 @@ export function g5nbtA(ctx: Ctx) {
     )
   }
   if (ctx.mode === 'round') {
-    const place = ctx.rng.chance(0.5) ? 0.1 : 1
-    let raw = roundTo(ctx.rng.int(1000, 9999) / 100, 2)
+    const places = Math.min(4, Math.max(1, knobNum(ctx, 'decimals', 2)))
+    const place = places === 1 || ctx.rng.chance(0.5) ? 1 : 0.1
+    let raw = roundTo(ctx.rng.int(10 ** places, 10 ** (places + 2) - 1) / 10 ** places, places)
     if (place === 0.1) raw = avoidTie(Math.round(raw * 10), 1) / 10
     const rounded = place === 1 ? roundHalfUp(raw, 1) : roundHalfUp(Math.round(raw * 100), 10) / 100
     const name = place === 1 ? L('whole number', 'ganzen Zahl', 'número entero') : L('tenth', 'Zehntel', 'décimo')
@@ -167,16 +265,22 @@ export function g5nbtA(ctx: Ctx) {
 }
 
 export function g5nbtB(ctx: Ctx) {
+  if (ctx.mode === 'head') return mentalWhole(ctx)
   if (ctx.mode === 'mul' || ctx.mode === 'div') {
     return g4nbtB({ ...ctx, mode: ctx.mode, knobs: { ...ctx.knobs, digits: knobNum(ctx, 'digits', 3), remain: false } })
   }
   if (ctx.mode === 'muldec' || ctx.mode === 'divdec') {
+    const places = Math.min(3, Math.max(1, knobNum(ctx, 'places', 2)))
     const aT = ctx.rng.int(2, 12)
     const bT = ctx.rng.int(2, 9)
+    const left = places === 3 ? aT / 100 : aT / 10
+    const right = places === 1 ? bT : bT / 10
     if (ctx.mode === 'divdec') {
-      const quotient = aT / 10
-      const divisor = bT / 10
-      const dividend = roundTo(quotient * divisor, 2)
+      const quotient = left
+      const divisor = right
+      const dividend = roundTo(quotient * divisor, 4)
+      const qDigits = places === 3 ? 2 : 1
+      const dDigits = places === 1 ? 0 : 1
       return ask(
         ctx,
         L('Find the quotient.', 'Bestimme den Quotienten.', 'Halla el cociente.'),
@@ -184,12 +288,14 @@ export function g5nbtB(ctx: Ctx) {
         { kind: 'number', value: quotient, tolerance: 0.001 },
         [
           L('Multiply the divisor and the quotient to check the dividend.', 'Multipliziere Divisor und Quotient, um den Dividenden zu prüfen.', 'Multiplica el divisor y el cociente para comprobar el dividendo.'),
-          L(`${n(dividend, 2).en} ÷ ${n(divisor, 1).en} = ${n(quotient, 1).en}.`, `${n(dividend, 2).de} ÷ ${n(divisor, 1).de} = ${n(quotient, 1).de}.`, `${n(dividend, 2).es} ÷ ${n(divisor, 1).es} = ${n(quotient, 1).es}.`),
+          L(`${n(dividend, qDigits + dDigits).en} ÷ ${n(divisor, dDigits).en} = ${n(quotient, qDigits).en}.`, `${n(dividend, qDigits + dDigits).de} ÷ ${n(divisor, dDigits).de} = ${n(quotient, qDigits).de}.`, `${n(dividend, qDigits + dDigits).es} ÷ ${n(divisor, dDigits).es} = ${n(quotient, qDigits).es}.`),
         ],
-        expression([{ t: 'v', value: dividend, digits: 2 }, { t: 'op', v: '÷' }, { t: 'v', value: divisor, digits: 1 }]),
+        expression([{ t: 'v', value: dividend, digits: qDigits + dDigits }, { t: 'op', v: '÷' }, { t: 'v', value: divisor, digits: dDigits }]),
       )
     }
-    const product = roundTo((aT / 10) * (bT / 10), 2)
+    const product = roundTo(left * right, 4)
+    const leftDigits = places === 3 ? 2 : 1
+    const rightDigits = places === 1 ? 0 : 1
     return ask(
       ctx,
       L('Find the product.', 'Bestimme das Produkt.', 'Halla el producto.'),
@@ -197,33 +303,79 @@ export function g5nbtB(ctx: Ctx) {
       { kind: 'number', value: product, tolerance: 0.001 },
       [
         L('Multiply as whole numbers, then give the product as many decimal places as both factors have together.', 'Multipliziere wie ganze Zahlen und gib dem Produkt so viele Dezimalstellen, wie beide Faktoren zusammen haben.', 'Multiplica como enteros y dale al producto tantos decimales como tienen los factores juntos.'),
-        L(`${n(aT / 10, 1).en} × ${n(bT / 10, 1).en} = ${n(product, 2).en}.`, `${n(aT / 10, 1).de} × ${n(bT / 10, 1).de} = ${n(product, 2).de}.`, `${n(aT / 10, 1).es} × ${n(bT / 10, 1).es} = ${n(product, 2).es}.`),
+        L(`${n(left, leftDigits).en} × ${n(right, rightDigits).en} = ${n(product, leftDigits + rightDigits).en}.`, `${n(left, leftDigits).de} × ${n(right, rightDigits).de} = ${n(product, leftDigits + rightDigits).de}.`, `${n(left, leftDigits).es} × ${n(right, rightDigits).es} = ${n(product, leftDigits + rightDigits).es}.`),
       ],
-      expression([{ t: 'v', value: aT / 10, digits: 1 }, { t: 'op', v: '×' }, { t: 'v', value: bT / 10, digits: 1 }]),
+      expression([{ t: 'v', value: left, digits: leftDigits }, { t: 'op', v: '×' }, { t: 'v', value: right, digits: rightDigits }]),
     )
   }
-  const a = roundTo(ctx.rng.int(50, 400) / 100, 2)
-  const b = roundTo(ctx.rng.int(20, 250) / 100, 2)
+  const places = Math.min(3, Math.max(1, knobNum(ctx, 'places', 2)))
+  const scale = 10 ** places
+  let a = roundTo(ctx.rng.int(scale, 40 * scale) / scale, places)
+  let b = roundTo(ctx.rng.int(scale, 25 * scale) / scale, places)
+  if (a === b) b = roundTo(a + 1 / scale, places)
   const left = ctx.mode === 'subdec' ? Math.max(a, b) : a
   const right = ctx.mode === 'subdec' ? Math.min(a, b) : b
-  const value = ctx.mode === 'subdec' ? roundTo(left - right, 2) : roundTo(left + right, 2)
+  const value = ctx.mode === 'subdec' ? roundTo(left - right, places) : roundTo(left + right, places)
   return ask(
     ctx,
     L(ctx.mode === 'subdec' ? 'Find the difference.' : 'Find the sum.', ctx.mode === 'subdec' ? 'Bestimme die Differenz.' : 'Bestimme die Summe.', ctx.mode === 'subdec' ? 'Halla la diferencia.' : 'Halla la suma.'),
     { type: 'number', allowDecimal: true },
     { kind: 'number', value, tolerance: 0.001 },
     [
-      L('Line up the decimal points, then add or subtract from the hundredths.', 'Richte die Dezimalzeichen aus und rechne von den Hundertsteln aus.', 'Alinea los puntos decimales y opera desde los centésimos.'),
-      L(`${n(left, 2).en} ${ctx.mode === 'subdec' ? '−' : '+'} ${n(right, 2).en} = ${n(value, 2).en}.`, `${n(left, 2).de} ${ctx.mode === 'subdec' ? '−' : '+'} ${n(right, 2).de} = ${n(value, 2).de}.`, `${n(left, 2).es} ${ctx.mode === 'subdec' ? '−' : '+'} ${n(right, 2).es} = ${n(value, 2).es}.`),
+      L('Line up the decimal points, then work from the smallest place.', 'Richte die Dezimalzeichen aus und rechne von der kleinsten Stelle aus.', 'Alinea los puntos decimales y opera desde el lugar menor.'),
+      L(`${n(left, places).en} ${ctx.mode === 'subdec' ? '−' : '+'} ${n(right, places).en} = ${n(value, places).en}.`, `${n(left, places).de} ${ctx.mode === 'subdec' ? '−' : '+'} ${n(right, places).de} = ${n(value, places).de}.`, `${n(left, places).es} ${ctx.mode === 'subdec' ? '−' : '+'} ${n(right, places).es} = ${n(value, places).es}.`),
     ],
-    expression([{ t: 'v', value: left, digits: 2 }, { t: 'op', v: ctx.mode === 'subdec' ? '−' : '+' }, { t: 'v', value: right, digits: 2 }]),
+    expression([{ t: 'v', value: left, digits: places }, { t: 'op', v: ctx.mode === 'subdec' ? '−' : '+' }, { t: 'v', value: right, digits: places }]),
   )
+}
+
+function mentalWhole(ctx: Ctx) {
+  const digits = Math.min(6, Math.max(2, knobNum(ctx, 'digits', 3)))
+  const op = ctx.rng.pick(['add', 'sub', 'mul', 'div'] as const)
+  const lo = 10 ** (digits - 1)
+  const hi = 10 ** digits - 1
+  const prompt = L('Work this out in your head.', 'Rechne das im Kopf.', 'Calcúlalo mentalmente.')
+  if (op === 'mul') {
+    const a = ctx.rng.int(lo, hi)
+    const b = ctx.rng.int(2, 12)
+    return ask(ctx, prompt, { type: 'number' }, { kind: 'number', value: a * b }, [
+      L(`Multiply ${n(a).en} by ${n(b).en}.`, `Multipliziere ${n(a).de} mit ${n(b).de}.`, `Multiplica ${n(a).es} por ${n(b).es}.`),
+      L(`${n(a).en} × ${n(b).en} = ${n(a * b).en}.`, `${n(a).de} × ${n(b).de} = ${n(a * b).de}.`, `${n(a).es} × ${n(b).es} = ${n(a * b).es}.`),
+    ], expression([{ t: 'v', value: a }, { t: 'op', v: '×' }, { t: 'v', value: b }]))
+  }
+  if (op === 'div') {
+    const divisor = ctx.rng.int(2, 12)
+    const quotient = ctx.rng.int(lo, Math.max(lo, Math.floor(hi / divisor)))
+    const dividend = quotient * divisor
+    return ask(ctx, prompt, { type: 'number' }, { kind: 'number', value: quotient }, [
+      L(`How many groups of ${n(divisor).en} are in ${n(dividend).en}?`, `Wie viele Gruppen zu ${n(divisor).de} stecken in ${n(dividend).de}?`, `¿Cuántos grupos de ${n(divisor).es} hay en ${n(dividend).es}?`),
+      L(`${n(dividend).en} ÷ ${n(divisor).en} = ${n(quotient).en}.`, `${n(dividend).de} ÷ ${n(divisor).de} = ${n(quotient).de}.`, `${n(dividend).es} ÷ ${n(divisor).es} = ${n(quotient).es}.`),
+    ], expression([{ t: 'v', value: dividend }, { t: 'op', v: '÷' }, { t: 'v', value: divisor }]))
+  }
+  const otherDigits = ctx.rng.chance(0.45) ? Math.max(2, digits - 1) : digits
+  const a = ctx.rng.int(lo, hi)
+  const bLo = 10 ** (otherDigits - 1)
+  const bHi = 10 ** otherDigits - 1
+  let b = ctx.rng.int(bLo, bHi)
+  let big = a
+  if (op === 'sub') {
+    big = Math.max(a, b)
+    const smallHi = Math.max(1, big - 1)
+    b = ctx.rng.int(Math.min(bLo, smallHi), smallHi)
+  }
+  const value = op === 'sub' ? big - b : a + b
+  return ask(ctx, prompt, { type: 'number' }, { kind: 'number', value }, [
+    L('Line the places up and work from the ones.', 'Richte die Stellen aus und arbeite von den Einern.', 'Alinea los lugares y trabaja desde las unidades.'),
+    L(`${n(op === 'sub' ? big : a).en} ${op === 'sub' ? '−' : '+'} ${n(b).en} = ${n(value).en}.`, `${n(op === 'sub' ? big : a).de} ${op === 'sub' ? '−' : '+'} ${n(b).de} = ${n(value).de}.`, `${n(op === 'sub' ? big : a).es} ${op === 'sub' ? '−' : '+'} ${n(b).es} = ${n(value).es}.`),
+  ], expression([{ t: 'v', value: op === 'sub' ? big : a }, { t: 'op', v: op === 'sub' ? '−' : '+' }, { t: 'v', value: b }]))
 }
 
 export function g5nfA(ctx: Ctx) {
   const den = knobNum(ctx, 'den', 8)
-  const d1 = ctx.rng.pick([2, 3, 4, 5, 6, 8, 10, 12].filter((d) => d <= den))
-  const d2 = ctx.rng.pick([3, 4, 5, 6, 8, 10, 12].filter((d) => d <= den && d !== d1))
+  const pool = densUpTo(den)
+  const d1 = ctx.rng.pick(pool)
+  const rest = pool.filter((d) => d !== d1)
+  const d2 = ctx.rng.pick(rest.length ? rest : pool)
   const n1 = ctx.rng.int(1, d1 - 1)
   const n2 = ctx.rng.int(1, d2 - 1)
   const common = (d1 * d2) / gcdSafe(d1, d2)
@@ -284,7 +436,7 @@ export function g5nfB(ctx: Ctx) {
   if (ctx.mode === 'divwhole' || ctx.mode === 'divunit') {
     if (ctx.mode === 'divwhole') {
       const whole = ctx.rng.int(2, 6)
-      const den = ctx.rng.pick([2, 3, 4, 5, 6, 8, 10, 12].filter((d) => d <= cap))
+      const den = ctx.rng.pick(densUpTo(cap))
       return fractionQuestion(ctx, whole * den, 1, L(
         `What is ${n(whole).en} ÷ ${frac(0, 1, den)}?`,
         `Wie viel ist ${n(whole).de} ÷ ${frac(0, 1, den)}?`,
@@ -295,7 +447,7 @@ export function g5nfB(ctx: Ctx) {
       ])
     }
     const a = ctx.rng.pick([2, 3, 4])
-    const b = ctx.rng.pick([2, 3, 4, 5, 6, 8, 10, 12].filter((d) => d <= cap))
+    const b = ctx.rng.pick(densUpTo(cap))
     return fractionQuestion(ctx, b, a, L(
       `What is ${frac(0, 1, a)} ÷ ${frac(0, 1, b)}?`,
       `Wie viel ist ${frac(0, 1, a)} ÷ ${frac(0, 1, b)}?`,
@@ -307,7 +459,7 @@ export function g5nfB(ctx: Ctx) {
   }
   if (ctx.mode === 'mulwhole') {
     const whole = ctx.rng.int(8, 36)
-    const den = ctx.rng.pick([2, 3, 4, 5, 6, 8, 10, 12].filter((d) => d <= cap))
+    const den = ctx.rng.pick(densUpTo(cap))
     const numer = ctx.rng.int(1, den - 1)
     return fractionQuestion(ctx, whole * numer, den, L(
       `What is ${frac(0, numer, den)} of ${n(whole).en}?`,
@@ -334,7 +486,7 @@ export function g5nfB(ctx: Ctx) {
 
 export function g5mdA(ctx: Ctx) {
   if (ctx.mode === 'compound') {
-    const meters = ctx.rng.int(1, 6)
+    const meters = ctx.rng.int(1, Math.max(1, knobNum(ctx, 'max', 6)))
     const cm = ctx.rng.int(5, 90)
     return ask(
       ctx,
@@ -385,9 +537,9 @@ export function g5mdB(ctx: Ctx) {
 
 export function g5mdC(ctx: Ctx) {
   const top = knobNum(ctx, 'max', 8)
-  const l = ctx.rng.int(2, top)
-  const w = ctx.rng.int(2, top - 2)
-  const h = ctx.rng.int(2, top - 3)
+  const l = ctx.rng.int(2, Math.max(2, top))
+  const w = ctx.rng.int(2, Math.max(2, top - 1))
+  const h = ctx.rng.int(2, Math.max(2, top - 2))
   if (ctx.mode === 'layers') {
     return ask(
       ctx,
@@ -521,6 +673,185 @@ export function g5gB(ctx: Ctx) {
     [
       L('Squares have four right angles and opposite sides equal, so they belong inside the rectangles.', 'Quadrate haben vier rechte Winkel und gleiche Gegenseiten, also gehören sie zu den Rechtecken.', 'Los cuadrados tienen cuatro ángulos rectos y lados opuestos iguales, así que viven dentro de los rectángulos.'),
       L('The other way fails: a long rectangle is not a square.', 'Umgekehrt stimmt es nicht: ein langes Rechteck ist kein Quadrat.', 'Al revés falla: un rectángulo largo no es un cuadrado.'),
+    ],
+  )
+}
+
+function groupPiece(count: number, one: Localized, many: Localized): Localized | null {
+  if (count <= 0) return null
+  const word = count === 1 ? one : many
+  return L(`${n(count).en} ${word.en}`, `${n(count).de} ${word.de}`, `${n(count).es} ${word.es}`)
+}
+
+export function groupedWords(value: number): Localized {
+  const abs = Math.abs(Math.trunc(value))
+  const trillions = Math.floor(abs / 1_000_000_000_000)
+  const billions = Math.floor(abs / 1_000_000_000) % 1000
+  const millions = Math.floor(abs / 1_000_000) % 1000
+  const thousands = Math.floor(abs / 1000) % 1000
+  const rest = abs % 1000
+  const parts = [
+    groupPiece(trillions, L('trillion', 'Billion', 'billón'), L('trillion', 'Billionen', 'billones')),
+    groupPiece(billions, L('billion', 'Milliarde', 'mil millones'), L('billion', 'Milliarden', 'mil millones')),
+    groupPiece(millions, L('million', 'Million', 'millón'), L('million', 'Millionen', 'millones')),
+    groupPiece(thousands, L('thousand', 'Tausend', 'mil'), L('thousand', 'Tausend', 'mil')),
+    rest > 0 ? n(rest) : null,
+  ].filter((part): part is Localized => part != null)
+  if (!parts.length) return n(0)
+  return L(parts.map((part) => part.en).join(' '), parts.map((part) => part.de).join(' '), parts.map((part) => part.es).join(' '))
+}
+
+function largeDigits(ctx: Ctx) {
+  return Math.min(15, Math.max(3, knobNum(ctx, 'digits', 6)))
+}
+
+function wholeOf(ctx: Ctx, digits: number) {
+  const width = Math.min(15, Math.max(1, digits))
+  const lo = width <= 1 ? 0 : 10 ** (width - 1)
+  const hi = 10 ** width - 1
+  return Math.min(hi, Math.max(lo, ctx.rng.int(lo, Math.max(lo, hi))))
+}
+
+export function g5nbtC(ctx: Ctx) {
+  const digits = largeDigits(ctx)
+  if (ctx.mode === 'neighbor') {
+    let value = wholeOf(ctx, digits)
+    if (ctx.rng.chance(0.6)) {
+      const power = 10 ** ctx.rng.int(1, Math.max(1, digits - 1))
+      value = ctx.rng.chance(0.5) ? power : Math.max(1, power - 1)
+    }
+    return ask(
+      ctx,
+      L(`Write the predecessor and the successor of ${n(value).en}.`, `Schreibe Vorgänger und Nachfolger von ${n(value).de}.`, `Escribe el anterior y el siguiente de ${n(value).es}.`),
+      {
+        type: 'multi',
+        fields: [
+          { id: 'before', label: L('Predecessor', 'Vorgänger', 'Anterior') },
+          { id: 'after', label: L('Successor', 'Nachfolger', 'Siguiente') },
+        ],
+      },
+      { kind: 'multi', parts: { before: value - 1, after: value + 1 } },
+      [
+        L('The predecessor is one less. The successor is one more.', 'Der Vorgänger ist eins weniger. Der Nachfolger ist eins mehr.', 'El anterior es uno menos. El siguiente es uno más.'),
+        L(`${n(value - 1).en} comes just before ${n(value).en}, and ${n(value + 1).en} comes just after.`, `${n(value - 1).de} steht direkt vor ${n(value).de}, und ${n(value + 1).de} direkt danach.`, `${n(value - 1).es} va justo antes de ${n(value).es}, y ${n(value + 1).es} justo después.`),
+      ],
+    )
+  }
+  if (ctx.mode === 'compare') {
+    const value = wholeOf(ctx, digits)
+    const useWords = knobFlag(ctx, 'words')
+    let other = value
+    if (!useWords || ctx.rng.chance(0.65)) {
+      const delta = ctx.rng.pick([1, -1, 10, -10, 100, -100, 1000, -1000, 1_000_000, -1_000_000])
+      other = value + delta
+      if (other < 0) other = value + Math.abs(delta)
+    }
+    if (!useWords && other === value) other = value + ctx.rng.pick([1, 10, 1000])
+    const wordsOnLeft = useWords && ctx.rng.chance(0.5)
+    const left = wordsOnLeft ? groupedWords(value) : n(value)
+    const right = wordsOnLeft ? n(other) : useWords ? groupedWords(other) : n(other)
+    const sign = value < other ? '<' : value > other ? '>' : '='
+    return ask(
+      ctx,
+      L('Which sign is true?', 'Welches Zeichen stimmt?', '¿Qué signo es cierto?'),
+      { type: 'compare', left, right },
+      { kind: 'compare', sign },
+      [
+        L('Turn a number written in words into digits, then compare from the largest place.', 'Wandle eine Zahl in Worten in Ziffern um und vergleiche von der größten Stelle aus.', 'Convierte un número en palabras a cifras y compara desde el lugar mayor.'),
+        L(`${n(value).en} ${sign} ${n(other).en}.`, `${n(value).de} ${sign} ${n(other).de}.`, `${n(value).es} ${sign} ${n(other).es}.`),
+      ],
+    )
+  }
+  if (ctx.mode === 'order') {
+    const howMany = Math.min(6, Math.max(3, knobNum(ctx, 'count', 4)))
+    const values: number[] = []
+    let guard = 0
+    while (values.length < howMany && guard < 40) {
+      const width = ctx.rng.int(Math.max(1, digits - 2), digits)
+      const next = wholeOf(ctx, width)
+      if (!values.includes(next)) values.push(next)
+      guard += 1
+    }
+    while (values.length < howMany) values.push((values[values.length - 1] ?? 10) + values.length * 3 + 1)
+    if (values[0] >= 10) {
+      const chars = String(values[0]).split('')
+      const index = ctx.rng.int(0, chars.length - 2)
+      const swap = chars[index]
+      chars[index] = chars[index + 1]
+      chars[index + 1] = swap
+      const close = Number(chars.join(''))
+      if (close !== values[0] && !values.includes(close)) values[1] = close
+    }
+    const ids = values.map((value, index) => `${value}:${index}`)
+    const correct = values.map((value, index) => ({ value, id: ids[index] })).sort((a, b) => a.value - b.value || a.id.localeCompare(b.id)).map((item) => item.id)
+    const shown = shuffleNotSorted(ids, correct, ctx.rng)
+    return ask(
+      ctx,
+      L('Order the numbers from least to greatest.', 'Ordne die Zahlen von der kleinsten zur größten.', 'Ordena los números de menor a mayor.'),
+      { type: 'order', items: shown.map((id) => ({ id, label: n(Number(id.split(':')[0])) })) },
+      { kind: 'order', ids: correct },
+      [
+        L('Compare the largest place first. A number with fewer digits is smaller when the others are at least that long.', 'Vergleiche zuerst die größte Stelle. Eine Zahl mit weniger Stellen ist kleiner, wenn die anderen mindestens so lang sind.', 'Compara primero el lugar mayor. Un número con menos cifras es menor cuando los otros son al menos así de largos.'),
+        L(`The order is ${[...values].sort((a, b) => a - b).map((value) => n(value).en).join(', ')}.`, `Die Reihenfolge ist ${[...values].sort((a, b) => a - b).map((value) => n(value).de).join(', ')}.`, `El orden es ${[...values].sort((a, b) => a - b).map((value) => n(value).es).join(', ')}.`),
+      ],
+    )
+  }
+  if (ctx.mode === 'round') {
+    const place = chosenRoundPlace(ctx, digits)
+    const safe = avoidTie(wholeOf(ctx, digits), place)
+    const rounded = roundHalfUp(safe, place)
+    const phrase = roundPhrase(place)
+    return ask(
+      ctx,
+      L(`Round ${n(safe).en} to ${phrase.en}.`, `Runde ${n(safe).de} auf ${phrase.de}.`, `Redondea ${n(safe).es} a ${phrase.es}.`),
+      { type: 'number' },
+      { kind: 'number', value: rounded },
+      [
+        L('Look one digit to the right of the place you are rounding to.', 'Schau eine Ziffer rechts von der Stelle, auf die du rundest.', 'Mira una cifra a la derecha del lugar al que redondeas.'),
+        L(`${n(safe).en} rounds to ${n(rounded).en}.`, `${n(safe).de} wird zu ${n(rounded).de}.`, `${n(safe).es} se redondea a ${n(rounded).es}.`),
+      ],
+    )
+  }
+  if (ctx.mode === 'line') {
+    const stepTable = [1, 10, 50, 100, 500, 1000, 5000, 10_000, 50_000, 100_000, 500_000, 1_000_000, 10_000_000, 100_000_000, 1_000_000_000, 10_000_000_000, 100_000_000_000, 1_000_000_000_000]
+    const step = [...stepTable].reverse().find((item) => item * 12 < 10 ** digits) ?? 10
+    let target = Math.max(step, Math.round(wholeOf(ctx, digits) / step) * step)
+    const before = ctx.rng.int(3, 5)
+    let min = Math.max(0, target - before * step)
+    min -= min % step
+    let max = min + step * ctx.rng.int(8, 12)
+    if (target < min || target > max) target = min + step * 4
+    if (target > max) max = target + step * 3
+    return ask(
+      ctx,
+      L(
+        `Place ${n(target).en} on the number line. It runs from ${n(min).en} to ${n(max).en}.`,
+        `Setze ${n(target).de} auf den Zahlenstrahl. Er geht von ${n(min).de} bis ${n(max).de}.`,
+        `Ubica ${n(target).es} en la recta numérica. Va de ${n(min).es} a ${n(max).es}.`,
+      ),
+      { type: 'numberline', min, max, step },
+      { kind: 'number', value: target },
+      [
+        L(`Each jump is ${n(step).en}. Count the jumps from ${n(min).en}.`, `Jeder Sprung ist ${n(step).de}. Zähle die Sprünge ab ${n(min).de}.`, `Cada salto es ${n(step).es}. Cuenta los saltos desde ${n(min).es}.`),
+        L(`${n(target).en} sits on this line.`, `${n(target).de} liegt auf diesem Strahl.`, `${n(target).es} queda en esta recta.`),
+      ],
+    )
+  }
+  const width = digits
+  const used = knobFlag(ctx, 'words') && ctx.rng.chance(0.5) ? ctx.rng.int(Math.max(1, width - 3), width) : width
+  const value = wholeOf(ctx, used)
+  const cells = String(value).padStart(width, '0').slice(-width).split('').map(Number)
+  const words = knobFlag(ctx, 'words')
+  return ask(
+    ctx,
+    words
+      ? L(`Enter ${groupedWords(value).en} in the place-value chart.`, `Trage ${groupedWords(value).de} in die Stellenwerttafel ein.`, `Escribe ${groupedWords(value).es} en el tablero de valor posicional.`)
+      : L(`Build ${n(value).en} in the place-value chart.`, `Baue ${n(value).de} in der Stellenwerttafel.`, `Arma ${n(value).es} en el tablero de valor posicional.`),
+    { type: 'digits', columns: placeColumns(width) },
+    { kind: 'digits', digits: cells },
+    [
+      L('Each column is worth ten times the column on its right. Empty places are zeros.', 'Jede Spalte ist zehnmal so viel wert wie die Spalte rechts. Leere Stellen sind Nullen.', 'Cada columna vale diez veces la de su derecha. Los lugares vacíos son ceros.'),
+      L(`The digits are ${cells.join(' ')}.`, `Die Ziffern sind ${cells.join(' ')}.`, `Las cifras son ${cells.join(' ')}.`),
     ],
   )
 }

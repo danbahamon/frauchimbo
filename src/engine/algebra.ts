@@ -3,10 +3,10 @@ import { ask, knobNum, L, n, type Ctx } from './shared'
 export function equation(ctx: Ctx, steps: 'one' | 'two' | 'dist') {
   // The largest number the hidden x can take. The default of 9 is the classic range.
   const cap = knobNum(ctx, 'max', 9)
-  const x = ctx.rng.int(2, cap)
+  const x = ctx.rng.int(2, Math.max(2, cap))
   if (steps === 'one') {
     if (ctx.rng.chance(0.5)) {
-      const b = ctx.rng.int(2, cap + 3)
+      const b = ctx.rng.int(2, Math.max(2, cap + 3))
       return ask(
         ctx,
         L('Solve for x.', 'Löse nach x.', 'Resuelve para x.'),
@@ -19,7 +19,7 @@ export function equation(ctx: Ctx, steps: 'one' | 'two' | 'dist') {
         { type: 'balance', left: L(`x + ${n(b).en}`, `x + ${n(b).de}`, `x + ${n(b).es}`), right: n(x + b) },
       )
     }
-    const a = ctx.rng.int(2, cap - 1)
+    const a = ctx.rng.int(2, Math.max(2, cap - 1))
     return ask(
       ctx,
       L('Solve for x.', 'Löse nach x.', 'Resuelve para x.'),
@@ -33,8 +33,9 @@ export function equation(ctx: Ctx, steps: 'one' | 'two' | 'dist') {
     )
   }
   if (steps === 'dist') {
-    const a = ctx.rng.int(2, 5)
-    const b = ctx.rng.int(1, 6)
+    const edge = Math.max(2, Math.min(30, cap))
+    const a = ctx.rng.int(2, edge)
+    const b = ctx.rng.int(1, edge)
     return ask(
       ctx,
       L('Solve for x.', 'Löse nach x.', 'Resuelve para x.'),
@@ -47,8 +48,8 @@ export function equation(ctx: Ctx, steps: 'one' | 'two' | 'dist') {
       { type: 'balance', left: L(`${n(a).en}(x + ${n(b).en})`, `${n(a).de}(x + ${n(b).de})`, `${n(a).es}(x + ${n(b).es})`), right: n(a * (x + b)) },
     )
   }
-  const a = ctx.rng.int(2, cap - 1)
-  const b = ctx.rng.int(-(cap - 1), cap - 1) || 3
+  const a = ctx.rng.int(2, Math.max(2, cap - 1))
+  const b = ctx.rng.int(-Math.max(1, cap - 1), Math.max(1, cap - 1)) || 3
   const c = a * x + b
   return ask(
     ctx,

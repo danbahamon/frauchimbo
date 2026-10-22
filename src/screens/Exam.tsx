@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { DOMAIN_COLOR, SKILLS, defaultKnobs, getSkill } from '../data/skills'
+import { DOMAIN_COLOR, SKILLS, getSkill, knobsForKind, problemKinds } from '../data/skills'
 import { CHECK_MONTHS, materialize, presetFor } from '../data/pacing'
 import { generateTest } from '../engine'
 import { gradeAnswer, isCorrect } from '../lib/grade'
-import { settingsKey } from '../lib/levels'
+import { levelKey, settingsKey } from '../lib/levels'
 import { attemptDetail } from '../lib/review'
-import type { ActiveTest, Answer, Blueprint, BlueprintItem, DomainId, Grade, TestRecord } from '../lib/types'
+import type { ActiveTest, Answer, Blueprint, BlueprintItem, DomainId, Grade, KnobValues, Locale, Skill, TestRecord } from '../lib/types'
 import { DOMAIN_ORDER } from '../lib/types'
 import { monthName, t, tx } from '../lib/i18n'
 import { monthIndex, uid } from '../lib/math'
+import { skillMatches } from '../lib/search'
 import { useStore } from '../state'
 import { Variables } from '../components/Variables'
 import { AnswerWidget } from '../components/widgets'
@@ -20,6 +21,13 @@ import { Icon } from '../components/Icon'
 
 const GRADES: Grade[] = [3, 4, 5, 6, 7]
 const CAP = 36
+
+function kindLabel(skill: Skill, knobs: KnobValues, locale: Locale) {
+  const mode = knobs.mode
+  if (typeof mode !== 'string') return ''
+  const option = problemKinds(skill).find((item) => item.value === mode)
+  return option ? tx(locale, option.label) : ''
+}
 
 function clock(ms: number) {
   const total = Math.max(0, Math.round(ms / 1000))
@@ -64,11 +72,18 @@ function Builder() {
   const [grade, setGrade] = useState<Grade>(profile?.grade ?? 4)
   const [title, setTitle] = useState('')
   const [tray, setTray] = useState<BlueprintItem[]>([])
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
   const [panel, setPanel] = useState<'choose' | 'month' | 'compose'>('choose')
   const [strand, setStrand] = useState<DomainId | 'all'>('all')
+  const [everyGrade, setEveryGrade] = useState(false)
+  const [query, setQuery] = useState('')
   const [monthAt, setMonthAt] = useState(0)
+  const [focusId, setFocusId] = useState<string | null>(null)
   const total = tray.reduce((sum, item) => sum + item.count, 0)
+  useEffect(() => {
+    if (openIndex === null) return
+    document.querySelector(`[data-open='true']`)?.scrollIntoView({ block: 'nearest' })
+  }, [openIndex])
   const monthNow = monthIndex()
   const school = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6]
   const reached = CHECK_MONTHS.filter((month) => school.indexOf(month) <= school.indexOf(monthNow)).at(-1) ?? 9
@@ -113,17 +128,57 @@ function Builder() {
     items: tray.filter((item) => item.count > 0),
   })
 
-  const add = (skillId: string) => {
+  const addKind = (skillId: string, mode?: string) => {
     const skill = getSkill(skillId)
     if (!skill) return
     const difficulty = profile ? (profile.position === 'review' ? 2 : profile.position === 'stretch' ? 4 : 3) : 3
-    setTray((current) => {
-      const used = current.reduce((sum, item) => sum + item.count, 0)
-      if (used >= CAP) return current
-      const index = current.findIndex((item) => item.skillId === skillId)
-      if (index >= 0) return current.map((item, itemIndex) => itemIndex === index ? { ...item, count: item.count + 1 } : item)
-      return [...current, { skillId, count: 2, difficulty, knobs: defaultKnobs(skill, difficulty) }]
-    })
+    const used = tray.reduce((sum, item) => sum + item.count, 0)
+    if (used >= CAP) return
+    const index = tray.findIndex((item) => item.skillId === skillId && (mode === undefined || item.knobs.mode === mode))
+    if (index >= 0) {
+      setTray(tray.map((item, itemIndex) => itemIndex === index ? { ...item, count: item.count + 1 } : item))
+      setOpenIndex(index)
+      return
+    }
+    setTray([...tray, { skillId, count: 2, difficulty, knobs: knobsForKind(skill, difficulty, mode) }])
+    setOpenIndex(tray.length)
+  }
+
+  const openCategory = (skillId: string) => {
+    const skill = getSkill(skillId)
+    if (!skill) return
+    if (problemKinds(skill).length === 0) {
+      addKind(skillId)
+      return
+    }
+    setFocusId(skillId)
+  }
+
+  const move = (index: number, delta: number) => {
+    const next = index + delta
+    if (next < 0 || next >= tray.length) return
+    const copy = tray.slice()
+    const [row] = copy.splice(index, 1)
+    if (!row) return
+    copy.splice(next, 0, row)
+    setTray(copy)
+    setOpenIndex((open) => (open === index ? next : open === next ? index : open))
+  }
+
+  const setDifficulty = (index: number, difficulty: number) => {
+    setTray((current) => current.map((row, itemIndex) => {
+      if (itemIndex !== index) return row
+      const skill = getSkill(row.skillId)
+      if (!skill) return { ...row, difficulty }
+      const mode = typeof row.knobs.mode === 'string' ? row.knobs.mode : undefined
+      const untouched = JSON.stringify(row.knobs) === JSON.stringify(knobsForKind(skill, row.difficulty, mode))
+      return { ...row, difficulty, knobs: untouched ? knobsForKind(skill, difficulty, mode) : row.knobs }
+    }))
+  }
+
+  const removeAt = (index: number) => {
+    setTray((current) => current.filter((_, itemIndex) => itemIndex !== index))
+    setOpenIndex((open) => (open === index ? null : open !== null && open > index ? open - 1 : open))
   }
 
   const preset = month ? presetFor(grade, month) : undefined
@@ -178,35 +233,72 @@ function Builder() {
     )
   }
 
-  const skills = SKILLS.filter((skill) => skill.grade === grade && (strand === 'all' || skill.domain === strand))
+  const pool = SKILLS.filter((skill) => everyGrade || skill.grade === grade)
+  const strands = DOMAIN_ORDER.filter((item) => pool.some((skill) => skill.domain === item))
+  const strandOn = strand === 'all' || strands.includes(strand) ? strand : 'all'
+  const skills = pool.filter((skill) => {
+    if (strandOn !== 'all' && skill.domain !== strandOn) return false
+    return skillMatches(skill, query)
+  })
+  const focused = focusId ? getSkill(focusId) : undefined
+  const kinds = focused ? problemKinds(focused) : []
+  const questionsFor = (skillId: string, mode?: string) => tray.reduce((sum, item) => {
+    if (item.skillId !== skillId) return sum
+    if (mode !== undefined && item.knobs.mode !== mode) return sum
+    return sum + item.count
+  }, 0)
   return (
     <div className="swap">
-      <button type="button" className="text-btn" onClick={() => setPanel('choose')}><Icon name="back" /> {t(locale, 'on.back')}</button>
+      <button type="button" className="text-btn" onClick={() => { setFocusId(null); setPanel('choose') }}><Icon name="back" /> {t(locale, 'on.back')}</button>
       <p className="kicker">{t(locale, 'test.build')}</p>
       <h1>{t(locale, 'test.mode.compose')}</h1>
-      {gradeRow}
+      <div className="segment">
+        {GRADES.map((item) => (
+          <button key={item} type="button" data-on={!everyGrade && grade === item} onClick={() => { setGrade(item); setEveryGrade(false); setMonthAt(0) }}>{item}</button>
+        ))}
+        <button type="button" data-on={everyGrade} onClick={() => setEveryGrade(true)}>{t(locale, 'test.allGrades')}</button>
+      </div>
       <input className="field" style={{ marginTop: 12 }} value={title} placeholder={t(locale, 'test.title.ph')} onChange={(event) => setTitle(event.target.value)} />
       <p className="fine">{t(locale, 'test.tray', { n: total })}</p>
       {tray.length ? (
-        <div className="stack">
+        <div className="tray">
           {tray.map((item, index) => {
             const skill = getSkill(item.skillId)
             if (!skill) return null
-            const key = `${item.skillId}-${index}`
+            const kind = kindLabel(skill, item.knobs, locale)
             return (
-              <article key={key} className="tray-row">
+              <article key={`${item.skillId}-${String(item.knobs.mode ?? '')}-${index}`} className="tray-row" data-open={openIndex === index}>
+                <div className="tray-order">
+                  <button type="button" className="tray-mini icon" disabled={index === 0} aria-label={t(locale, 'test.up')} onClick={() => move(index, -1)}>↑</button>
+                  <button type="button" className="tray-mini icon" disabled={index === tray.length - 1} aria-label={t(locale, 'test.down')} onClick={() => move(index, 1)}>↓</button>
+                </div>
                 <i style={{ background: DOMAIN_COLOR[skill.domain] }} />
-                <b>{tx(locale, skill.title)}</b>
-                <span className="stepper">
-                  <button type="button" onClick={() => setTray((current) => current.map((row, itemIndex) => itemIndex === index ? { ...row, count: Math.max(1, row.count - 1) } : row))}>−</button>
-                  {item.count}
-                  <button type="button" onClick={() => setTray((current) => current.map((row, itemIndex) => itemIndex === index && total < CAP ? { ...row, count: row.count + 1 } : row))}>+</button>
-                </span>
-                <button type="button" className="text-btn" onClick={() => setOpenId(openId === key ? null : key)}>{t(locale, 'play.setup')}</button>
-                <button type="button" className="text-btn" onClick={() => setTray((current) => current.filter((_, itemIndex) => itemIndex !== index))}>{t(locale, 'test.remove')}</button>
-                {openId === key ? (
+                <div className="tray-copy">
+                  <b>{kind || tx(locale, skill.title)}</b>
+                  <small>{skill.code}{kind ? ` · ${tx(locale, skill.title)}` : ''} · {item.difficulty} {t(locale, settingsKey(skill, item.difficulty, item.knobs, ['mode']))}{everyGrade || skill.grade !== grade ? ` · ${t(locale, 'grade.n', { n: skill.grade })}` : ''}</small>
+                </div>
+                <div className="tray-actions">
+                  <span className="stepper">
+                    <button type="button" onClick={() => setTray((current) => current.map((row, itemIndex) => itemIndex === index ? { ...row, count: Math.max(1, row.count - 1) } : row))}>−</button>
+                    {item.count}
+                    <button type="button" onClick={() => setTray((current) => current.map((row, itemIndex) => itemIndex === index && total < CAP ? { ...row, count: row.count + 1 } : row))}>+</button>
+                  </span>
+                  <button type="button" className="tray-mini icon" aria-pressed={openIndex === index} aria-label={t(locale, 'play.setup')} title={t(locale, 'play.setup')} onClick={() => setOpenIndex(openIndex === index ? null : index)}><Icon name="gear" size={16} /></button>
+                  <button type="button" className="tray-mini danger" onClick={() => removeAt(index)}>{t(locale, 'test.remove')}</button>
+                </div>
+                {openIndex === index ? (
                   <div className="tray-more">
-                    <Variables skill={skill} locale={locale} values={item.knobs} onChange={(knobs) => setTray((current) => current.map((row, itemIndex) => itemIndex === index ? { ...row, knobs } : row))} />
+                    <div className="variable">
+                      <div className="variable-head"><span>{t(locale, 'test.difficulty')}</span></div>
+                      <div className="segment wrap" role="radiogroup" aria-label={t(locale, 'test.difficulty')}>
+                        {[1, 2, 3, 4, 5].map((level) => (
+                          <button key={level} type="button" role="radio" aria-checked={item.difficulty === level} data-on={item.difficulty === level} onClick={() => setDifficulty(index, level)}>
+                            {level} · {t(locale, levelKey(level))}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <Variables skill={skill} locale={locale} values={item.knobs} resetDifficulty={item.difficulty} hideIds={['mode']} showIntro={false} onChange={(knobs) => setTray((current) => current.map((row, itemIndex) => itemIndex === index ? { ...row, knobs } : row))} />
                   </div>
                 ) : null}
               </article>
@@ -214,24 +306,53 @@ function Builder() {
           })}
         </div>
       ) : null}
-      <div className="segment scroll-x" style={{ marginTop: 12 }}>
-        <button type="button" data-on={strand === 'all'} onClick={() => setStrand('all')}>{t(locale, 'practice.all')}</button>
-        {DOMAIN_ORDER.filter((item) => SKILLS.some((skill) => skill.grade === grade && skill.domain === item)).map((item) => (
-          <button key={item} type="button" data-on={strand === item} onClick={() => setStrand(item)}>{t(locale, `domain.${item}`)}</button>
-        ))}
-      </div>
-      <div className="catalog">
-        {skills.map((skill, index) => {
-          const picked = tray.find((item) => item.skillId === skill.id)
-          return (
-            <button key={skill.id} type="button" className="skill-card" data-here={Boolean(picked)} style={{ ['--wash' as string]: DOMAIN_COLOR[skill.domain], animationDelay: `${Math.min(index, 8) * 30}ms` }} onClick={() => add(skill.id)}>
-              <SkillDemo domain={skill.domain} />
-              <small>{skill.code}</small>
-              <b>{tx(locale, skill.title)}</b>
-              <span>{picked ? t(locale, 'test.tray', { n: picked.count }) : t(locale, 'test.add')}</span>
-            </button>
-          )
-        })}
+      <div className="picker">
+        {focused && kinds.length ? (
+          <div className="kind-stage">
+            <button type="button" className="text-btn" onClick={() => setFocusId(null)}><Icon name="back" /> {t(locale, 'test.back')}</button>
+            <p className="kicker">{everyGrade || focused.grade !== grade ? `${t(locale, 'grade.n', { n: focused.grade })} · ${focused.code}` : focused.code}</p>
+            <h2>{tx(locale, focused.title)}</h2>
+            <p className="muted">{tx(locale, focused.blurb)}</p>
+            <p className="fine">{t(locale, 'test.kindNote')}</p>
+            <div className="catalog">
+              {kinds.map((option, index) => {
+                const count = questionsFor(focused.id, option.value)
+                return (
+                  <button key={option.value} type="button" className="skill-card kind-card" data-here={count > 0} style={{ ['--wash' as string]: DOMAIN_COLOR[focused.domain], animationDelay: `${Math.min(index, 8) * 30}ms` }} onClick={() => addKind(focused.id, option.value)}>
+                    <small>{focused.code}</small>
+                    <b>{tx(locale, option.label)}</b>
+                    <span>{count ? t(locale, 'test.tray', { n: count }) : t(locale, 'test.add')}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ) : (
+          <>
+            <input className="field" value={query} aria-label={t(locale, 'practice.search')} placeholder={t(locale, 'practice.search')} onChange={(event) => setQuery(event.target.value)} />
+            <div className="segment scroll-x">
+              <button type="button" data-on={strandOn === 'all'} onClick={() => setStrand('all')}>{t(locale, 'practice.all')}</button>
+              {strands.map((item) => (
+                <button key={item} type="button" data-on={strandOn === item} onClick={() => setStrand(item)}>{t(locale, `domain.${item}`)}</button>
+              ))}
+            </div>
+            <div className="catalog">
+              {skills.length === 0 ? <p className="muted">{t(locale, 'practice.empty')}</p> : null}
+              {skills.map((skill, index) => {
+                const count = questionsFor(skill.id)
+                const choices = problemKinds(skill)
+                return (
+                  <button key={skill.id} type="button" className="skill-card" data-here={count > 0} style={{ ['--wash' as string]: DOMAIN_COLOR[skill.domain], animationDelay: `${Math.min(index, 8) * 30}ms` }} onClick={() => openCategory(skill.id)}>
+                    <SkillDemo domain={skill.domain} skillId={skill.id} />
+                    <small>{everyGrade ? `${t(locale, 'grade.n', { n: skill.grade })} · ${skill.code}` : skill.code}</small>
+                    <b>{tx(locale, skill.title)}</b>
+                    <span>{count ? t(locale, 'test.tray', { n: count }) : choices.length ? t(locale, 'test.pickKind') : t(locale, 'test.add')}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
       </div>
       {total ? (
         <div className="builder-actions">
@@ -660,10 +781,11 @@ function Shared() {
       <div className="list">
         {blueprint.items.map((item, index) => {
           const skill = getSkill(item.skillId)
+          const kind = skill ? kindLabel(skill, item.knobs, locale) : ''
           return (
             <article key={`${item.skillId}-${index}`} className="card pad">
-              <b>{skill ? tx(locale, skill.title) : item.skillId}</b>
-              <p className="fine">{t(locale, 'test.tray', { n: item.count })}{skill ? ` · ${t(locale, settingsKey(skill, item.difficulty, item.knobs))}` : ''}</p>
+              <b>{kind || (skill ? tx(locale, skill.title) : item.skillId)}</b>
+              <p className="fine">{skill && kind ? `${tx(locale, skill.title)} · ` : ''}{t(locale, 'test.tray', { n: item.count })}{skill ? ` · ${t(locale, settingsKey(skill, item.difficulty, item.knobs, ['mode']))}` : ''}</p>
             </article>
           )
         })}

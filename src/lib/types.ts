@@ -151,6 +151,7 @@ export type Response =
       labels: Localized[]
       axisChoices: number[]
       maxValue: number
+      step?: number
     }
   | { type: 'angle' }
   | { type: 'ratio'; max: number }

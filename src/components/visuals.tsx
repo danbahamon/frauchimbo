@@ -322,9 +322,18 @@ export function QuestionStem({ question, locale }: { question: Question; locale:
   )
 }
 
+function entryBand(length: number) {
+  if (length >= 13) return '2'
+  if (length >= 9) return '1'
+  return undefined
+}
+
 export function AnswerFace({ question, answer, locale, blank }: { question: Question; answer: Question['answer'] | null; locale: Locale; blank: string }) {
   if (!answer) return <div className="entry">{blank}</div>
-  if (answer.kind === 'number') return <div className="entry">{answer.value}</div>
+  if (answer.kind === 'number') {
+    const text = String(answer.value)
+    return <div className="entry num" data-long={entryBand(text.length)}>{text}</div>
+  }
   if (answer.kind === 'fraction') {
     return (
       <div className="entry fraction-entry">
@@ -362,10 +371,13 @@ export function AnswerFace({ question, answer, locale, blank }: { question: Ques
   }
   if (answer.kind === 'angle') return <StimulusView locale={locale} stimulus={{ type: 'angle', degrees: answer.degrees }} />
   if (answer.kind === 'ratio') return <div className="entry">{answer.a} : {answer.b}</div>
-  if (answer.kind === 'digits') return <div className="entry">{answer.digits.join(' ')}</div>
+  if (answer.kind === 'digits') {
+    const text = answer.digits.join('')
+    return <div className="entry num" data-long={entryBand(text.length)}>{text}</div>
+  }
   if (answer.kind === 'multi') {
     return (
-      <div className="entry" style={{ fontSize: '1.4rem', gap: 12 }}>
+      <div className="entry parts">
         {Object.entries(answer.parts).map(([key, value]) => <span key={key}>{key}={value}</span>)}
       </div>
     )

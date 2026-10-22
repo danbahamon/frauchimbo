@@ -50,6 +50,25 @@ function opt(value: string, en: string, de: string, es: string): KnobOption {
   return { value, label: L(en, de, es) }
 }
 
+// Places a rounding question can target, through the hundred trillions.
+const ROUND_TO = [
+  opt('any', 'Any place', 'Beliebig', 'Cualquiera'),
+  opt('10', 'Tens', 'Zehner', 'Decenas'),
+  opt('100', 'Hundreds', 'Hunderter', 'Centenas'),
+  opt('1000', 'Thousands', 'Tausender', 'Millares'),
+  opt('10000', 'Ten thousands', 'Zehntausender', 'Decenas de millar'),
+  opt('100000', 'Hundred thousands', 'Hunderttausender', 'Centenas de millar'),
+  opt('1000000', 'Millions', 'Millionen', 'Millones'),
+  opt('10000000', 'Ten millions', 'Zehn Millionen', 'Diez millones'),
+  opt('100000000', 'Hundred millions', 'Hundert Millionen', 'Cien millones'),
+  opt('1000000000', 'Billions', 'Milliarden', 'Mil millones'),
+  opt('10000000000', 'Ten billions', 'Zehn Milliarden', 'Diez mil millones'),
+  opt('100000000000', 'Hundred billions', 'Hundert Milliarden', 'Cien mil millones'),
+  opt('1000000000000', 'Trillions', 'Billionen', 'Billones'),
+  opt('10000000000000', 'Ten trillions', 'Zehn Billionen', 'Diez billones'),
+  opt('100000000000000', 'Hundred trillions', 'Hundert Billionen', 'Cien billones'),
+]
+
 function skill(partial: Omit<Skill, 'knobs'> & { knobs?: Knob[] }): Skill {
   return { knobs: [], ...partial }
 }
@@ -81,7 +100,7 @@ export const SKILLS: Skill[] = [
         [opt('mul', 'Multiply', 'Multiplizieren', 'Multiplicar'), opt('div', 'Divide', 'Dividieren', 'Dividir'), opt('mixed', 'Mixed', 'Gemischt', 'Mixto')],
         ['mul', 'mul', 'mixed', 'div', 'mixed'],
       ),
-      range('max', L('Largest factor', 'Größter Faktor', 'Mayor factor'), FACTOR_HINT, 2, 12, [5, 6, 9, 10, 12]),
+      range('max', L('Largest factor', 'Größter Faktor', 'Mayor factor'), FACTOR_HINT, 2, 25, [5, 8, 12, 16, 20]),
     ],
   }),
   skill({
@@ -102,7 +121,7 @@ export const SKILLS: Skill[] = [
         ],
         ['comm', 'missing', 'missing', 'dist', 'dist'],
       ),
-      range('max', L('Largest factor', 'Größter Faktor', 'Mayor factor'), FACTOR_HINT, 3, 12, [6, 7, 9, 10, 12]),
+      range('max', L('Largest factor', 'Größter Faktor', 'Mayor factor'), FACTOR_HINT, 3, 25, [6, 9, 12, 16, 20]),
     ],
   }),
   skill({
@@ -119,7 +138,7 @@ export const SKILLS: Skill[] = [
         [opt('mul', 'Multiply', 'Multiplizieren', 'Multiplicar'), opt('div', 'Divide', 'Dividieren', 'Dividir'), opt('mixed', 'Mixed', 'Gemischt', 'Mixto')],
         ['mul', 'mul', 'mixed', 'mixed', 'div'],
       ),
-      range('max', L('Largest factor', 'Größter Faktor', 'Mayor factor'), FACTOR_HINT, 2, 12, [5, 7, 9, 10, 12]),
+      range('max', L('Largest factor', 'Größter Faktor', 'Mayor factor'), FACTOR_HINT, 2, 25, [5, 8, 12, 16, 22]),
     ],
   }),
   skill({
@@ -136,7 +155,7 @@ export const SKILLS: Skill[] = [
         [opt('twostep', 'Two-step story', 'Zweistufige Geschichte', 'Historia de dos pasos'), opt('pattern', 'Pattern', 'Muster', 'Patrón')],
         ['twostep', 'twostep', 'pattern', 'twostep', 'pattern'],
       ),
-      range('max', MAX_NUMBER, L('The biggest group size or count, and the largest pattern step.', 'Die größte Gruppengröße oder Anzahl und der größte Musterschritt.', 'El mayor tamaño de grupo o cantidad, y el mayor paso del patrón.'), 5, 12, [6, 7, 9, 10, 12]),
+      range('max', MAX_NUMBER, L('The biggest group size or count, and the largest pattern step.', 'Die größte Gruppengröße oder Anzahl und der größte Musterschritt.', 'El mayor tamaño de grupo o cantidad, y el mayor paso del patrón.'), 5, 40, [6, 10, 16, 24, 32]),
     ],
   }),
   skill({
@@ -163,10 +182,20 @@ export const SKILLS: Skill[] = [
         L('Numbers up to', 'Zahlen bis', 'Números hasta'),
         L('The largest number in sums, differences, and rounding.', 'Die größte Zahl in Summen, Differenzen und beim Runden.', 'El mayor número en sumas, restas y redondeos.'),
         100,
-        1000,
-        [300, 500, 1000, 1000, 1000],
+        100000,
+        [300, 1000, 5000, 20000, 100000],
         100,
         showFor('mode', 'add', 'sub', 'round'),
+      ),
+      range(
+        'by',
+        L('Largest factor', 'Größter Faktor', 'Mayor factor'),
+        L('The largest number multiplied by a ten.', 'Die größte Zahl, die mit einer Zehnerzahl malgenommen wird.', 'El mayor número que se multiplica por una decena.'),
+        2,
+        30,
+        [5, 8, 12, 18, 25],
+        1,
+        showFor('mode', 'times10'),
       ),
     ],
   }),
@@ -190,7 +219,7 @@ export const SKILLS: Skill[] = [
         ],
         ['shade', 'name', 'line', 'compare', 'equiv'],
       ),
-      den(2, 8, [4, 4, 6, 8, 8]),
+      den(2, 12, [4, 6, 8, 10, 12]),
     ],
   }),
   skill({
@@ -232,9 +261,15 @@ export const SKILLS: Skill[] = [
     prereq: [],
     knobs: [
       mode(
-        [opt('read', 'Read', 'Lesen', 'Leer'), opt('build', 'Build', 'Bauen', 'Construir')],
-        ['read', 'read', 'read', 'build', 'build'],
+        [
+          opt('read', 'Read', 'Lesen', 'Leer'),
+          opt('build', 'Build', 'Bauen', 'Construir'),
+          opt('most', 'Tallest or shortest', 'Höchste oder niedrigste', 'Más alta o más baja'),
+          opt('match', 'Equal heights', 'Gleich hohe Säulen', 'Alturas iguales'),
+        ],
+        ['read', 'read', 'most', 'match', 'build'],
       ),
+      range('top', L('Tallest bar', 'Höchste Säule', 'Barra más alta'), L('The largest count a bar can show.', 'Die größte Anzahl, die eine Säule zeigen kann.', 'La mayor cantidad que puede mostrar una barra.'), 4, 40, [6, 8, 12, 20, 30]),
     ],
   }),
   skill({
@@ -251,7 +286,7 @@ export const SKILLS: Skill[] = [
         [opt('area', 'Find area', 'Fläche finden', 'Hallar el área'), opt('missing', 'Missing side', 'Fehlende Seite', 'Lado faltante')],
         ['area', 'area', 'area', 'missing', 'missing'],
       ),
-      range('max', L('Longest side', 'Längste Seite', 'Lado más largo'), L('The longest side a rectangle can have.', 'Die längste Seite eines Rechtecks.', 'El lado más largo que puede tener un rectángulo.'), 3, 12, [5, 6, 9, 10, 12]),
+      range('max', L('Longest side', 'Längste Seite', 'Lado más largo'), L('The longest side a rectangle can have.', 'Die längste Seite eines Rechtecks.', 'El lado más largo que puede tener un rectángulo.'), 3, 40, [5, 8, 12, 20, 30]),
     ],
   }),
   skill({
@@ -268,7 +303,7 @@ export const SKILLS: Skill[] = [
         [opt('peri', 'Find perimeter', 'Umfang finden', 'Hallar el perímetro'), opt('missing', 'Missing side', 'Fehlende Seite', 'Lado faltante')],
         ['peri', 'peri', 'peri', 'missing', 'missing'],
       ),
-      range('max', L('Longest side', 'Längste Seite', 'Lado más largo'), L('The longest side a rectangle can have.', 'Die längste Seite eines Rechtecks.', 'El lado más largo que puede tener un rectángulo.'), 6, 12, [8, 10, 12, 12, 12]),
+      range('max', L('Longest side', 'Längste Seite', 'Lado más largo'), L('The longest side a rectangle can have.', 'Die längste Seite eines Rechtecks.', 'El lado más largo que puede tener un rectángulo.'), 4, 60, [8, 12, 20, 36, 48]),
     ],
   }),
   skill({
@@ -315,7 +350,7 @@ export const SKILLS: Skill[] = [
         [opt('two', 'Two steps', 'Zwei Schritte', 'Dos pasos'), opt('three', 'Three steps', 'Drei Schritte', 'Tres pasos')],
         ['two', 'two', 'two', 'three', 'three'],
       ),
-      range('max', L('Items per box, up to', 'Stücke pro Kiste, höchstens', 'Objetos por caja, como máximo'), L('The most items that fit in one box or tray.', 'Die größte Anzahl an Stücken in einer Kiste.', 'La mayor cantidad de objetos en una caja o bandeja.'), 6, 20, [10, 12, 15, 15, 20]),
+      range('max', L('Items per box, up to', 'Stücke pro Kiste, höchstens', 'Objetos por caja, como máximo'), L('The most items that fit in one box or tray.', 'Die größte Anzahl an Stücken in einer Kiste.', 'La mayor cantidad de objetos en una caja o bandeja.'), 6, 100, [10, 15, 24, 40, 60]),
       toggle('remain', L('Include a remainder', 'Mit Rest', 'Con residuo'), L('Some items are left over at the end.', 'Am Ende bleiben einige Stücke übrig.', 'Al final sobran algunos objetos.'), [false, false, true, true, true]),
     ],
   }),
@@ -338,7 +373,7 @@ export const SKILLS: Skill[] = [
         ],
         ['factor', 'multiple', 'gcf', 'lcm', 'gcf'],
       ),
-      range('max', MAX_NUMBER, MAX_HINT, 10, 40, [12, 16, 20, 24, 30]),
+      range('max', MAX_NUMBER, MAX_HINT, 10, 150, [12, 24, 40, 80, 120]),
     ],
   }),
   skill({
@@ -355,7 +390,7 @@ export const SKILLS: Skill[] = [
         [opt('next', 'Next terms', 'Nächste Glieder', 'Siguientes términos'), opt('rule', 'Name the rule', 'Regel benennen', 'Nombrar la regla')],
         ['next', 'next', 'rule', 'next', 'rule'],
       ),
-      range('jump', L('Biggest jump', 'Größter Sprung', 'Salto mayor'), L('The largest amount a pattern adds or takes away.', 'Der größte Betrag, den ein Muster addiert oder abzieht.', 'La mayor cantidad que un patrón suma o resta.'), 3, 12, [5, 8, 12, 12, 12]),
+      range('jump', L('Biggest jump', 'Größter Sprung', 'Salto mayor'), L('The largest amount a pattern adds or takes away.', 'Der größte Betrag, den ein Muster addiert oder abzieht.', 'La mayor cantidad que un patrón suma o resta.'), 2, 80, [4, 8, 16, 32, 50]),
     ],
   }),
   skill({
@@ -377,7 +412,15 @@ export const SKILLS: Skill[] = [
         ],
         ['value', 'round', 'build', 'times', 'times'],
       ),
-      range('digits', DIGITS, L('How many places the number has.', 'Wie viele Stellen die Zahl hat.', 'Cuántos lugares tiene el número.'), 4, 6, [4, 5, 5, 5, 6]),
+      range('digits', DIGITS, L('How many places the number has.', 'Wie viele Stellen die Zahl hat.', 'Cuántos lugares tiene el número.'), 4, 15, [4, 6, 9, 12, 15]),
+      choose(
+        'place',
+        L('Round to', 'Runden auf', 'Redondear a'),
+        L('Which place the rounding uses. Any stays inside the number.', 'Welche Stelle das Runden nutzt. Beliebig bleibt innerhalb der Zahl.', 'Qué lugar usa el redondeo. Cualquiera se queda dentro del número.'),
+        ROUND_TO,
+        ['any', '100', '1000', '100000', 'any'],
+        showFor('mode', 'round'),
+      ),
     ],
   }),
   skill({
@@ -399,7 +442,17 @@ export const SKILLS: Skill[] = [
         ],
         ['add', 'sub', 'mul', 'div', 'mul'],
       ),
-      range('digits', DIGITS, L('How many digits each number has.', 'Wie viele Stellen jede Zahl hat.', 'Cuántas cifras tiene cada número.'), 2, 4, [2, 2, 3, 3, 4]),
+      range('digits', DIGITS, L('How many digits each number has.', 'Wie viele Stellen jede Zahl hat.', 'Cuántas cifras tiene cada número.'), 2, 7, [2, 3, 4, 5, 6]),
+      range(
+        'factors',
+        L('Multiplier digits', 'Stellen des Faktors', 'Cifras del factor'),
+        L('How many digits the multiplier or divisor has.', 'Wie viele Stellen der Faktor oder der Divisor hat.', 'Cuántas cifras tiene el multiplicador o el divisor.'),
+        1,
+        3,
+        [1, 1, 1, 2, 3],
+        1,
+        showFor('mode', 'mul', 'div'),
+      ),
       toggle(
         'remain',
         L('Remainders in division', 'Reste bei der Division', 'Residuos en la división'),
@@ -427,7 +480,7 @@ export const SKILLS: Skill[] = [
         ],
         ['equiv', 'equiv', 'compare', 'order', 'compare'],
       ),
-      den(4, 12, [4, 4, 6, 8, 10]),
+      den(4, 24, [4, 6, 8, 12, 18]),
       simple(showFor('mode', 'equiv')),
     ],
   }),
@@ -450,7 +503,7 @@ export const SKILLS: Skill[] = [
         ],
         ['add', 'add', 'sub', 'mixed', 'mulwhole'],
       ),
-      den(3, 12, [6, 8, 10, 10, 12]),
+      den(3, 24, [6, 8, 12, 16, 20]),
       simple(),
     ],
   }),
@@ -498,7 +551,7 @@ export const SKILLS: Skill[] = [
         ],
         ['metric', 'metric', 'time', 'custom', 'metric'],
       ),
-      range('max', L('Largest amount', 'Größte Menge', 'Cantidad mayor'), L('The biggest count of units a question can use.', 'Die größte Anzahl an Einheiten in einer Aufgabe.', 'La mayor cantidad de unidades que usa una pregunta.'), 3, 20, [6, 8, 8, 10, 12]),
+      range('max', L('Largest amount', 'Größte Menge', 'Cantidad mayor'), L('The biggest count of units a question can use.', 'Die größte Anzahl an Einheiten in einer Aufgabe.', 'La mayor cantidad de unidades que usa una pregunta.'), 2, 250, [6, 12, 30, 80, 160]),
     ],
   }),
   skill({
@@ -579,7 +632,19 @@ export const SKILLS: Skill[] = [
         [opt('eval', 'Evaluate', 'Ausrechnen', 'Calcular'), opt('words', 'Match the words', 'Worte zuordnen', 'Emparejar palabras')],
         ['eval', 'eval', 'words', 'eval', 'words'],
       ),
-      range('max', MAX_NUMBER, L('The biggest number inside an expression.', 'Die größte Zahl in einem Term.', 'El mayor número dentro de una expresión.'), 6, 12, [6, 7, 9, 10, 12]),
+      range('max', MAX_NUMBER, L('The biggest number inside an expression.', 'Die größte Zahl in einem Term.', 'El mayor número dentro de una expresión.'), 4, 100, [8, 12, 24, 48, 80]),
+      choose(
+        'shape',
+        L('Expression shape', 'Form des Terms', 'Forma de la expresión'),
+        L('Which operations the expression uses.', 'Welche Rechenarten der Term nutzt.', 'Qué operaciones usa la expresión.'),
+        [
+          opt('sumprod', 'Add and multiply', 'Addieren und malnehmen', 'Sumar y multiplicar'),
+          opt('diff', 'Subtract in the mix', 'Mit Subtraktion', 'Con resta'),
+          opt('three', 'Three operations', 'Drei Rechenarten', 'Tres operaciones'),
+          opt('div', 'With division', 'Mit Division', 'Con división'),
+        ],
+        ['sumprod', 'sumprod', 'diff', 'three', 'div'],
+      ),
     ],
   }),
   skill({
@@ -596,7 +661,8 @@ export const SKILLS: Skill[] = [
         [opt('ask', 'Corresponding term', 'Zugehöriges Glied', 'Término correspondiente')],
         ['ask', 'ask', 'ask', 'ask', 'ask'],
       ),
-      range('max', L('Largest first step', 'Größter erster Schritt', 'Primer paso mayor'), L('The biggest step in the first pattern.', 'Der größte Schritt im ersten Muster.', 'El mayor paso del primer patrón.'), 2, 10, [4, 5, 6, 8, 10]),
+      range('max', L('Largest first step', 'Größter erster Schritt', 'Primer paso mayor'), L('The biggest step in the first pattern.', 'Der größte Schritt im ersten Muster.', 'El mayor paso del primer patrón.'), 2, 40, [3, 6, 10, 18, 28]),
+      range('term', L('Term number, up to', 'Gliednummer, höchstens', 'Número de término, como máximo'), L('How far along the pattern the question can ask.', 'Wie weit hinten im Muster die Frage fragen kann.', 'Qué tan adelante del patrón puede preguntar.'), 3, 20, [4, 6, 8, 12, 16]),
     ],
   }),
   skill({
@@ -623,10 +689,10 @@ export const SKILLS: Skill[] = [
         L('Decimal places', 'Dezimalstellen', 'Cifras decimales'),
         L('Digits after the point in the numbers compared.', 'Stellen nach dem Komma in den verglichenen Zahlen.', 'Cifras después del punto en los números comparados.'),
         1,
-        3,
-        [1, 2, 2, 2, 3],
+        4,
+        [1, 2, 2, 3, 4],
         1,
-        showFor('mode', 'compare'),
+        showFor('mode', 'compare', 'round'),
       ),
     ],
   }),
@@ -642,6 +708,7 @@ export const SKILLS: Skill[] = [
     knobs: [
       mode(
         [
+          opt('head', 'Mental math', 'Im Kopf', 'Cálculo mental'),
           opt('mul', 'Multiply wholes', 'Ganze Zahlen mal', 'Multiplicar enteros'),
           opt('div', 'Divide wholes', 'Ganze Zahlen geteilt', 'Dividir enteros'),
           opt('adddec', 'Add decimals', 'Dezimalzahlen addieren', 'Sumar decimales'),
@@ -651,7 +718,70 @@ export const SKILLS: Skill[] = [
         ],
         ['adddec', 'mul', 'muldec', 'div', 'divdec'],
       ),
-      range('digits', DIGITS, L('Digits in each whole number.', 'Stellen jeder ganzen Zahl.', 'Cifras de cada entero.'), 2, 4, [2, 2, 3, 3, 4], 1, showFor('mode', 'mul', 'div')),
+      range('digits', DIGITS, L('Digits in each whole number.', 'Stellen jeder ganzen Zahl.', 'Cifras de cada entero.'), 2, 6, [2, 3, 3, 4, 5], 1, showFor('mode', 'mul', 'div', 'head')),
+      range(
+        'places',
+        L('Decimal places', 'Dezimalstellen', 'Cifras decimales'),
+        L('How many digits follow the decimal point.', 'Wie viele Stellen nach dem Komma stehen.', 'Cuántas cifras siguen al punto decimal.'),
+        1,
+        3,
+        [1, 1, 2, 2, 3],
+        1,
+        showFor('mode', 'adddec', 'subdec', 'muldec', 'divdec'),
+      ),
+    ],
+  }),
+  skill({
+    id: '5.nbt.c',
+    grade: 5,
+    domain: 'NBT',
+    code: '5.NBT.C',
+    title: L('Large whole numbers', 'Große ganze Zahlen', 'Números enteros grandes'),
+    blurb: L(
+      'Place value through the hundred trillions, neighbors, comparisons, order, rounding, and the number line.',
+      'Stellenwerte bis zu hundert Billionen, Nachbarn, Vergleiche, Reihenfolge, Runden und der Zahlenstrahl.',
+      'Valor posicional hasta cien billones, vecinos, comparaciones, orden, redondeo y la recta numérica.',
+    ),
+    months: [9, 10, 6],
+    prereq: ['4.nbt.a'],
+    knobs: [
+      mode(
+        [
+          opt('chart', 'Place-value chart', 'Stellenwerttafel', 'Tablero de valor'),
+          opt('neighbor', 'Predecessor and successor', 'Vorgänger und Nachfolger', 'Anterior y siguiente'),
+          opt('compare', 'Compare', 'Vergleichen', 'Comparar'),
+          opt('order', 'Order', 'Ordnen', 'Ordenar'),
+          opt('round', 'Round', 'Runden', 'Redondear'),
+          opt('line', 'Number line', 'Zahlenstrahl', 'Recta numérica'),
+        ],
+        ['chart', 'compare', 'order', 'round', 'line'],
+      ),
+      range('digits', DIGITS, L('How many places the number has.', 'Wie viele Stellen die Zahl hat.', 'Cuántos lugares tiene el número.'), 3, 15, [4, 6, 9, 12, 15]),
+      toggle(
+        'words',
+        L('Numbers in words', 'Zahlen in Worten', 'Números en palabras'),
+        L('Show a number as trillions, billions, millions, and thousands.', 'Zeige eine Zahl als Billionen, Milliarden, Millionen und Tausend.', 'Muestra un número como billones, mil millones, millones y miles.'),
+        [false, false, true, true, true],
+        showFor('mode', 'chart', 'compare'),
+      ),
+      range(
+        'count',
+        L('How many numbers', 'Wie viele Zahlen', 'Cuántos números'),
+        L('How many numbers to put in order.', 'Wie viele Zahlen zu ordnen sind.', 'Cuántos números hay que ordenar.'),
+        3,
+        6,
+        [3, 4, 4, 5, 6],
+        1,
+        showFor('mode', 'order'),
+      ),
+      choose(
+        'place',
+        L('Round to', 'Runden auf', 'Redondear a'),
+        L('Which place the rounding uses. Any stays inside the number.', 'Welche Stelle das Runden nutzt. Beliebig bleibt innerhalb der Zahl.', 'Qué lugar usa el redondeo. Cualquiera se queda dentro del número.'),
+        ROUND_TO,
+        ['any', '1000', '10000', '100000', 'any'],
+        showFor('mode', 'round'),
+      ),
     ],
   }),
   skill({
@@ -672,7 +802,7 @@ export const SKILLS: Skill[] = [
         ],
         ['add', 'add', 'sub', 'mixed', 'sub'],
       ),
-      den(4, 12, [6, 6, 8, 8, 10]),
+      den(4, 24, [6, 8, 12, 16, 20]),
       simple(),
     ],
   }),
@@ -695,7 +825,7 @@ export const SKILLS: Skill[] = [
         ],
         ['mulwhole', 'mul', 'divunit', 'divwhole', 'mul'],
       ),
-      den(6, 12, [6, 6, 8, 8, 10]),
+      den(4, 24, [6, 8, 12, 16, 20]),
       simple(),
     ],
   }),
@@ -713,6 +843,7 @@ export const SKILLS: Skill[] = [
         [opt('metric', 'Single unit', 'Eine Einheit', 'Una unidad'), opt('compound', 'Compound', 'Zusammengesetzt', 'Compuesta')],
         ['metric', 'metric', 'compound', 'metric', 'compound'],
       ),
+      range('max', L('Largest amount', 'Größte Menge', 'Cantidad mayor'), L('The biggest count of meters in a compound length.', 'Die größte Meterzahl in einer zusammengesetzten Länge.', 'La mayor cantidad de metros en una longitud compuesta.'), 1, 40, [2, 4, 8, 16, 30], 1, showFor('mode', 'compound')),
     ],
   }),
   skill({
@@ -749,7 +880,33 @@ export const SKILLS: Skill[] = [
         ],
         ['layers', 'volume', 'volume', 'missing', 'volume'],
       ),
-      range('max', L('Largest edge', 'Größte Kante', 'Arista mayor'), L('The longest edge of a box.', 'Die längste Kante eines Quaders.', 'La arista más larga de una caja.'), 5, 10, [5, 6, 8, 9, 10]),
+      range('max', L('Largest edge', 'Größte Kante', 'Arista mayor'), L('The longest edge of a box.', 'Die längste Kante eines Quaders.', 'La arista más larga de una caja.'), 4, 30, [5, 8, 12, 18, 24]),
+    ],
+  }),
+  skill({
+    id: '5.md.d',
+    grade: 5,
+    domain: 'MD',
+    code: '5.MD.D',
+    title: L('Bar graphs and equal heights', 'Säulen und gleiche Höhen', 'Barras y alturas iguales'),
+    blurb: L(
+      'Read a tall graph, name the tallest or shortest, or find which bar can grow until two match.',
+      'Ein hohes Diagramm lesen, die höchste oder niedrigste nennen, oder finden, welche Säule wachsen kann, bis zwei gleich hoch sind.',
+      'Leer una gráfica alta, nombrar la más alta o la más baja, o hallar qué barra puede crecer hasta que dos queden iguales.',
+    ),
+    months: [4, 5, 6],
+    prereq: ['3.md.b'],
+    knobs: [
+      mode(
+        [
+          opt('read', 'Read', 'Lesen', 'Leer'),
+          opt('most', 'Tallest or shortest', 'Höchste oder niedrigste', 'Más alta o más baja'),
+          opt('match', 'Equal heights', 'Gleich hohe Säulen', 'Alturas iguales'),
+          opt('build', 'Build', 'Bauen', 'Construir'),
+        ],
+        ['read', 'most', 'match', 'build', 'match'],
+      ),
+      range('top', L('Tallest bar', 'Höchste Säule', 'Barra más alta'), L('The largest count a bar can show. One square can stand for many.', 'Die größte Anzahl, die eine Säule zeigen kann. Ein Kästchen kann für viele stehen.', 'La mayor cantidad que puede mostrar una barra. Un cuadrado puede valer por muchos.'), 20, 400, [40, 80, 120, 200, 320], 10),
     ],
   }),
   skill({
@@ -770,12 +927,12 @@ export const SKILLS: Skill[] = [
         ],
         ['plot', 'plot', 'read', 'distance', 'plot'],
       ),
-      range('max', L('Largest coordinate', 'Größte Koordinate', 'Coordenada mayor'), L('The biggest coordinate on the grid.', 'Die größte Koordinate im Gitter.', 'La mayor coordenada en la cuadrícula.'), 4, 12, [6, 8, 8, 10, 12]),
+      range('max', L('Largest coordinate', 'Größte Koordinate', 'Coordenada mayor'), L('The biggest coordinate on the grid.', 'Die größte Koordinate im Gitter.', 'La mayor coordenada en la cuadrícula.'), 4, 24, [6, 8, 12, 16, 20]),
       toggle(
         'quadrants',
         L('All four quadrants', 'Alle vier Quadranten', 'Los cuatro cuadrantes'),
         L('Points can sit left of zero or below it.', 'Punkte dürfen links von null oder unter null liegen.', 'Los puntos pueden quedar a la izquierda del cero o debajo.'),
-        [false, false, false, false, false],
+        [false, false, false, true, true],
       ),
     ],
   }),
@@ -814,7 +971,8 @@ export const SKILLS: Skill[] = [
         ],
         ['build', 'missing', 'unit', 'percent', 'missing'],
       ),
-      range('max', L('Largest ratio term', 'Größtes Verhältnisglied', 'Término mayor de la razón'), L('The biggest number in a ratio.', 'Die größte Zahl in einem Verhältnis.', 'El mayor número de una razón.'), 4, 12, [4, 6, 8, 10, 12], 1, showFor('mode', 'build', 'missing')),
+      range('max', L('Largest ratio term', 'Größtes Verhältnisglied', 'Término mayor de la razón'), L('The biggest number in a ratio.', 'Die größte Zahl in einem Verhältnis.', 'El mayor número de una razón.'), 4, 48, [6, 10, 16, 24, 36], 1, showFor('mode', 'build', 'missing')),
+      range('whole', L('Largest whole number', 'Größte ganze Zahl', 'Entero mayor'), L('The biggest whole number in a rate or a percent.', 'Die größte ganze Zahl in einer Rate oder einem Prozentsatz.', 'El mayor entero en una tasa o un porcentaje.'), 20, 400, [40, 60, 100, 160, 240], 10, showFor('mode', 'unit', 'percent')),
     ],
   }),
   skill({
@@ -835,7 +993,7 @@ export const SKILLS: Skill[] = [
         ],
         ['whole', 'frac', 'frac', 'word', 'frac'],
       ),
-      den(4, 12, [6, 6, 8, 8, 10], showFor('mode', 'frac', 'whole')),
+      den(4, 24, [6, 8, 12, 16, 20], showFor('mode', 'frac', 'whole')),
       simple(showFor('mode', 'frac', 'whole')),
     ],
   }),
@@ -858,7 +1016,7 @@ export const SKILLS: Skill[] = [
         ],
         ['gcf', 'lcm', 'mul', 'div', 'gcf'],
       ),
-      range('max', MAX_NUMBER, L('The biggest number used for GCF or LCM.', 'Die größte Zahl für ggT oder kgV.', 'El mayor número para el MCD o el mcm.'), 12, 60, [24, 30, 36, 40, 48], 1, showFor('mode', 'gcf', 'lcm')),
+      range('max', MAX_NUMBER, L('The biggest number used for GCF or LCM.', 'Die größte Zahl für ggT oder kgV.', 'El mayor número para el MCD o el mcm.'), 12, 240, [24, 40, 72, 120, 180], 1, showFor('mode', 'gcf', 'lcm')),
     ],
   }),
   skill({
@@ -885,10 +1043,9 @@ export const SKILLS: Skill[] = [
         L('Largest distance from zero', 'Größter Abstand von null', 'Distancia máxima desde cero'),
         L('The biggest absolute value a number can have.', 'Der größte Betrag, den eine Zahl haben kann.', 'El mayor valor absoluto que puede tener un número.'),
         3,
-        12,
-        [3, 4, 5, 6, 8],
+        50,
+        [4, 8, 12, 24, 40],
         1,
-        showFor('mode', 'abs', 'compare', 'plot'),
       ),
     ],
   }),
@@ -910,6 +1067,7 @@ export const SKILLS: Skill[] = [
         ],
         ['eval', 'eval', 'write', 'dist', 'eval'],
       ),
+      range('max', MAX_NUMBER, L('The biggest number in the expression.', 'Die größte Zahl im Term.', 'El mayor número de la expresión.'), 2, 30, [4, 6, 9, 15, 24]),
     ],
   }),
   skill({
@@ -930,7 +1088,7 @@ export const SKILLS: Skill[] = [
         ],
         ['one', 'one', 'two', 'ineq', 'two'],
       ),
-      range('max', MAX_NUMBER, L('The biggest number in an equation.', 'Die größte Zahl in einer Gleichung.', 'El mayor número en una ecuación.'), 5, 12, [6, 8, 9, 10, 12]),
+      range('max', MAX_NUMBER, L('The biggest number in an equation.', 'Die größte Zahl in einer Gleichung.', 'El mayor número en una ecuación.'), 5, 40, [6, 10, 15, 24, 36]),
     ],
   }),
   skill({
@@ -947,7 +1105,9 @@ export const SKILLS: Skill[] = [
         [opt('y', 'Find y', 'y finden', 'Hallar y'), opt('pair', 'Which pair', 'Welches Paar', 'Cuál par')],
         ['y', 'y', 'pair', 'y', 'pair'],
       ),
-      range('slope', L('Largest slope', 'Größte Steigung', 'Pendiente mayor'), L('The biggest multiplier m in y = mx + b.', 'Der größte Faktor m in y = mx + b.', 'El mayor multiplicador m en y = mx + b.'), 2, 9, [3, 4, 5, 6, 7]),
+      range('slope', L('Largest slope', 'Größte Steigung', 'Pendiente mayor'), L('The biggest multiplier m in y = mx + b.', 'Der größte Faktor m in y = mx + b.', 'El mayor multiplicador m en y = mx + b.'), 1, 20, [2, 4, 6, 10, 15]),
+      range('intercept', L('Largest intercept', 'Größter y-Achsenabschnitt', 'Intercepto mayor'), L('The biggest b in y = mx + b.', 'Das größte b in y = mx + b.', 'La mayor b en y = mx + b.'), 0, 30, [2, 4, 8, 12, 20]),
+      range('xup', L('Largest x', 'Größtes x', 'x mayor'), L('The biggest x-value substituted into the equation.', 'Der größte x-Wert, der eingesetzt wird.', 'El mayor valor de x que se sustituye.'), 1, 20, [3, 4, 6, 10, 15]),
     ],
   }),
   skill({
@@ -969,7 +1129,7 @@ export const SKILLS: Skill[] = [
         ],
         ['triangle', 'para', 'volume', 'surface', 'triangle'],
       ),
-      range('max', L('Largest measure', 'Größtes Maß', 'Medida mayor'), L('The biggest base, height, or edge.', 'Die größte Grundlinie, Höhe oder Kante.', 'La mayor base, altura o arista.'), 9, 14, [9, 10, 12, 12, 14]),
+      range('max', L('Largest measure', 'Größtes Maß', 'Medida mayor'), L('The biggest base, height, or edge.', 'Die größte Grundlinie, Höhe oder Kante.', 'La mayor base, altura o arista.'), 4, 40, [6, 10, 16, 24, 36]),
     ],
   }),
   skill({
@@ -1006,7 +1166,7 @@ export const SKILLS: Skill[] = [
         ],
         ['mean', 'median', 'range', 'mean', 'median'],
       ),
-      range('size', L('How many numbers', 'Wie viele Zahlen', 'Cuántos números'), L('How many values each data set has.', 'Wie viele Werte jede Datenmenge hat.', 'Cuántos valores tiene cada conjunto de datos.'), 3, 9, [3, 5, 5, 7, 9], 2),
+      range('size', L('How many numbers', 'Wie viele Zahlen', 'Cuántos números'), L('How many values each data set has.', 'Wie viele Werte jede Datenmenge hat.', 'Cuántos valores tiene cada conjunto de datos.'), 3, 15, [3, 5, 7, 11, 15], 2),
     ],
   }),
   skill({
@@ -1028,6 +1188,8 @@ export const SKILLS: Skill[] = [
         ],
         ['proportion', 'percent', 'change', 'tax', 'percent'],
       ),
+      range('price', L('Largest price', 'Höchster Preis', 'Precio mayor'), L('The biggest starting price or whole number.', 'Der größte Ausgangspreis oder die größte ganze Zahl.', 'El mayor precio inicial o entero.'), 20, 400, [40, 80, 120, 200, 320], 10),
+      range('rate', L('Largest percent', 'Größter Prozentsatz', 'Porcentaje mayor'), L('The biggest percent used for change, tax, or a part of a whole.', 'Der größte Prozentsatz für Änderung, Steuer oder einen Anteil.', 'El mayor porcentaje para un cambio, un impuesto o una parte.'), 5, 50, [10, 15, 20, 25, 40], 5, showFor('mode', 'percent', 'change', 'tax')),
     ],
   }),
   skill({
@@ -1056,7 +1218,7 @@ export const SKILLS: Skill[] = [
         [opt('int', 'Integers', 'Ganze Zahlen', 'Enteros'), opt('frac', 'Fractions', 'Brüche', 'Fracciones')],
         ['int', 'int', 'int', 'frac', 'frac'],
       ),
-      range('max', L('Largest integer', 'Größte ganze Zahl', 'Entero mayor'), L('The biggest absolute value the integers can reach.', 'Der größte Betrag, den die ganzen Zahlen erreichen.', 'El mayor valor absoluto que pueden alcanzar los enteros.'), 5, 20, [9, 10, 12, 12, 15], 1, showFor('family', 'int')),
+      range('max', L('Largest integer', 'Größte ganze Zahl', 'Entero mayor'), L('The biggest absolute value the integers can reach.', 'Der größte Betrag, den die ganzen Zahlen erreichen.', 'El mayor valor absoluto que pueden alcanzar los enteros.'), 5, 80, [9, 15, 24, 40, 60], 1, showFor('family', 'int')),
       simple(showFor('family', 'frac')),
     ],
   }),
@@ -1074,7 +1236,7 @@ export const SKILLS: Skill[] = [
         [opt('expand', 'Expand', 'Ausmultiplizieren', 'Desarrollar'), opt('factor', 'Factor', 'Faktorisieren', 'Factorizar')],
         ['expand', 'expand', 'factor', 'expand', 'factor'],
       ),
-      range('max', L('Largest coefficient', 'Größter Koeffizient', 'Coeficiente mayor'), L('The biggest number inside a linear expression.', 'Die größte Zahl in einem linearen Term.', 'El mayor número dentro de una expresión lineal.'), 4, 12, [5, 6, 8, 9, 10]),
+      range('max', L('Largest coefficient', 'Größter Koeffizient', 'Coeficiente mayor'), L('The biggest number inside a linear expression.', 'Die größte Zahl in einem linearen Term.', 'El mayor número dentro de una expresión lineal.'), 4, 30, [4, 6, 10, 16, 24]),
     ],
   }),
   skill({
@@ -1095,7 +1257,7 @@ export const SKILLS: Skill[] = [
         ],
         ['two', 'two', 'dist', 'ineq', 'dist'],
       ),
-      range('max', MAX_NUMBER, L('The biggest number in a two-step equation.', 'Die größte Zahl in einer Zweischritt-Gleichung.', 'El mayor número en una ecuación de dos pasos.'), 5, 12, [6, 8, 9, 10, 12], 1, showFor('mode', 'two')),
+      range('max', MAX_NUMBER, L('The biggest number in the equation.', 'Die größte Zahl in der Gleichung.', 'El mayor número de la ecuación.'), 5, 40, [6, 10, 16, 24, 36]),
     ],
   }),
   skill({
@@ -1116,7 +1278,7 @@ export const SKILLS: Skill[] = [
         ],
         ['scale', 'scale', 'down', 'area', 'area'],
       ),
-      range('factor', L('Largest scale factor', 'Größter Maßstabsfaktor', 'Factor de escala mayor'), L('The biggest multiplier used when scaling.', 'Der größte Faktor beim Maßstab.', 'El mayor factor al escalar.'), 2, 9, [3, 4, 5, 6, 7]),
+      range('factor', L('Largest scale factor', 'Größter Maßstabsfaktor', 'Factor de escala mayor'), L('The biggest multiplier used when scaling.', 'Der größte Faktor beim Maßstab.', 'El mayor factor al escalar.'), 2, 20, [3, 4, 6, 10, 16]),
     ],
   }),
   skill({
@@ -1139,7 +1301,7 @@ export const SKILLS: Skill[] = [
         ],
         ['circ', 'area', 'complement', 'triangle', 'surface'],
       ),
-      range('radius', L('Largest radius', 'Größter Radius', 'Radio mayor'), L('The biggest radius in a circle question.', 'Der größte Radius in einer Kreisaufgabe.', 'El mayor radio en una pregunta de círculos.'), 2, 12, [6, 8, 10, 10, 12], 1, showFor('mode', 'circ', 'area')),
+      range('radius', L('Largest radius', 'Größter Radius', 'Radio mayor'), L('The biggest radius in a circle question.', 'Der größte Radius in einer Kreisaufgabe.', 'El mayor radio en una pregunta de círculos.'), 2, 40, [6, 10, 16, 24, 36], 1, showFor('mode', 'circ', 'area')),
     ],
   }),
   skill({
@@ -1199,6 +1361,21 @@ export function defaultKnobs(item: Skill, difficulty: number): KnobValues {
   const index = Math.min(4, Math.max(0, Math.round(difficulty) - 1))
   const values: KnobValues = {}
   for (const knob of item.knobs) values[knob.id] = knob.byDifficulty[index]
+  return values
+}
+
+// The choices under "Kind of problem". A category opens onto these, one card each.
+export function problemKinds(item: Skill): KnobOption[] {
+  for (const knob of item.knobs) {
+    if (knob.id === 'mode' && knob.kind === 'select') return knob.options
+  }
+  return []
+}
+
+// Usual settings for a level, with the chosen kind kept in place.
+export function knobsForKind(item: Skill, difficulty: number, mode?: string): KnobValues {
+  const values = defaultKnobs(item, difficulty)
+  if (typeof mode === 'string') values.mode = mode
   return values
 }
 

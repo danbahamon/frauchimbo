@@ -2,11 +2,13 @@ import { gcd, lcm, roundHalfUp, roundTo } from '../lib/math'
 import type { Localized } from '../lib/types'
 import {
   ask,
+  densUpTo,
   expression,
   frac,
   knobBool,
   knobFlag,
   knobNum,
+  knobStr,
   L,
   n,
   scene,
@@ -198,7 +200,17 @@ export function g4oaC(ctx: Ctx) {
 }
 
 // Column names from the largest place down to the ones. A number with fewer places uses the last columns.
-const PLACE_NAMES = [
+// Fifteen digits is the longest whole number that still fits in a safe integer (through the hundred trillions).
+const PLACE_LONG = [
+  L('Hundred trillions', 'Hundert Billionen', 'Cien billones'),
+  L('Ten trillions', 'Zehn Billionen', 'Diez billones'),
+  L('Trillions', 'Billionen', 'Billones'),
+  L('Hundred billions', 'Hundert Milliarden', 'Cien mil millones'),
+  L('Ten billions', 'Zehn Milliarden', 'Diez mil millones'),
+  L('Billions', 'Milliarden', 'Mil millones'),
+  L('Hundred millions', 'Hundert Millionen', 'Cien millones'),
+  L('Ten millions', 'Zehn Millionen', 'Diez millones'),
+  L('Millions', 'Millionen', 'Millones'),
   L('Hundred thousands', 'Hunderttausender', 'Centenas de millar'),
   L('Ten thousands', 'Zehntausender', 'Decenas de millar'),
   L('Thousands', 'Tausender', 'Millares'),
@@ -207,12 +219,58 @@ const PLACE_NAMES = [
   L('Ones', 'Einer', 'Unidades'),
 ]
 
+export function placeColumns(count: number) {
+  const width = Math.min(PLACE_LONG.length, Math.max(1, count))
+  return PLACE_LONG.slice(PLACE_LONG.length - width)
+}
+
+const ROUND_PLACES = [
+  10, 100, 1000, 10_000, 100_000,
+  1_000_000, 10_000_000, 100_000_000,
+  1_000_000_000, 10_000_000_000, 100_000_000_000,
+  1_000_000_000_000, 10_000_000_000_000, 100_000_000_000_000,
+]
+
+function placesForDigits(count: number) {
+  const limit = 10 ** (count - 1)
+  const fitting = ROUND_PLACES.filter((place) => place <= limit)
+  return fitting.length ? fitting : [10]
+}
+
+export function chosenRoundPlace(ctx: Ctx, count: number) {
+  const fitting = placesForDigits(count)
+  const requested = knobStr(ctx, 'place', 'any')
+  if (requested === 'any') return ctx.rng.pick(fitting)
+  const place = Number(requested)
+  return fitting.includes(place) ? place : fitting[fitting.length - 1]
+}
+
+export function roundPhrase(place: number): Localized {
+  const phrases: Record<number, Localized> = {
+    10: L('the nearest ten', 'volle Zehner', 'la decena más cercana'),
+    100: L('the nearest hundred', 'volle Hunderter', 'la centena más cercana'),
+    1000: L('the nearest thousand', 'volle Tausender', 'el millar más cercano'),
+    10000: L('the nearest ten thousand', 'volle Zehntausender', 'la decena de millar más cercana'),
+    100000: L('the nearest hundred thousand', 'volle Hunderttausender', 'la centena de millar más cercana'),
+    1000000: L('the nearest million', 'volle Millionen', 'el millón más cercano'),
+    10000000: L('the nearest ten million', 'volle zehn Millionen', 'la decena de millón más cercana'),
+    100000000: L('the nearest hundred million', 'volle hundert Millionen', 'la centena de millón más cercana'),
+    1000000000: L('the nearest billion', 'volle Milliarden', 'los mil millones más cercanos'),
+    10000000000: L('the nearest ten billion', 'volle zehn Milliarden', 'los diez mil millones más cercanos'),
+    100000000000: L('the nearest hundred billion', 'volle hundert Milliarden', 'los cien mil millones más cercanos'),
+    1000000000000: L('the nearest trillion', 'volle Billionen', 'el billón más cercano'),
+    10000000000000: L('the nearest ten trillion', 'volle zehn Billionen', 'los diez billones más cercanos'),
+    100000000000000: L('the nearest hundred trillion', 'volle hundert Billionen', 'los cien billones más cercanos'),
+  }
+  return phrases[place] ?? phrases[10]
+}
+
 export function g4nbtA(ctx: Ctx) {
-  // The number has `count` places: 4 reaches the thousands, 5 adds ten thousands, 6 adds hundred thousands.
-  const count = Math.min(6, Math.max(4, knobNum(ctx, 'digits', 5)))
+  // The number has `count` places: 4 reaches the thousands, 15 reaches the hundred trillions.
+  const count = Math.min(PLACE_LONG.length, Math.max(4, knobNum(ctx, 'digits', 5)))
   const digits = Array.from({ length: count }, (_, index) => ctx.rng.int(index === 0 ? 1 : 0, 9))
   const places = Array.from({ length: count }, (_, index) => 10 ** (count - 1 - index))
-  const columns = PLACE_NAMES.slice(PLACE_NAMES.length - count)
+  const columns = placeColumns(count)
   const value = digits.reduce((sum, digit, index) => sum + digit * places[index], 0)
   if (ctx.mode === 'build') {
     return ask(
@@ -230,17 +288,17 @@ export function g4nbtA(ctx: Ctx) {
     )
   }
   if (ctx.mode === 'round') {
-    const place = ctx.rng.pick([10, 100, 1000])
+    const place = chosenRoundPlace(ctx, count)
     const safe = avoidTie(value, place)
     const rounded = roundHalfUp(safe, place)
-    const name = place === 10 ? L('ten', 'Zehner', 'decena') : place === 100 ? L('hundred', 'Hunderter', 'centena') : L('thousand', 'Tausender', 'millar')
+    const phrase = roundPhrase(place)
     return ask(
       ctx,
-      L(`Round ${n(safe).en} to the nearest ${name.en}.`, `Runde ${n(safe).de} auf den nächsten ${name.de}.`, `Redondea ${n(safe).es} al ${name.es} más cercano.`),
+      L(`Round ${n(safe).en} to ${phrase.en}.`, `Runde ${n(safe).de} auf ${phrase.de}.`, `Redondea ${n(safe).es} a ${phrase.es}.`),
       { type: 'number' },
       { kind: 'number', value: rounded },
       [
-        L(`Find the ${name.en}s place, then look one digit to the right.`, `Finde die Stelle der ${name.de} und schau eine Ziffer nach rechts.`, `Encuentra el lugar de ${name.es} y mira una cifra a la derecha.`),
+        L('Find the place you are rounding to, then look one digit to the right.', 'Finde die Stelle, auf die du rundest, und schau eine Ziffer nach rechts.', 'Encuentra el lugar al que redondeas y mira una cifra a la derecha.'),
         L(`${n(safe).en} rounds to ${n(rounded).en}.`, `${n(safe).de} wird zu ${n(rounded).de}.`, `${n(safe).es} se redondea a ${n(rounded).es}.`),
       ],
     )
@@ -285,13 +343,16 @@ export function g4nbtA(ctx: Ctx) {
 }
 
 export function g4nbtB(ctx: Ctx) {
-  const digits = Math.min(4, Math.max(2, knobNum(ctx, 'digits', 3)))
+  const digits = Math.min(7, Math.max(2, knobNum(ctx, 'digits', 3)))
+  const factorDigits = Math.min(3, Math.max(1, knobNum(ctx, 'factors', 1)))
   // Every number has exactly `digits` digits: 3 means 100 to 999.
   const lo = 10 ** (digits - 1)
   const hi = 10 ** digits - 1
   if (ctx.mode === 'mul') {
     const a = ctx.rng.int(lo, hi)
-    const b = ctx.rng.int(3, 9)
+    const bLo = factorDigits === 1 ? 2 : 10 ** (factorDigits - 1)
+    const bHi = Math.max(bLo, 10 ** factorDigits - 1)
+    const b = ctx.rng.int(bLo, bHi)
     return ask(
       ctx,
       L('Find the product.', 'Bestimme das Produkt.', 'Halla el producto.'),
@@ -305,9 +366,13 @@ export function g4nbtB(ctx: Ctx) {
     )
   }
   if (ctx.mode === 'div') {
-    const divisor = ctx.rng.int(2, 9)
-    // The quotient keeps the digit count, so the dividend stays within the chosen size.
-    const quotient = ctx.rng.int(lo, Math.floor(hi / divisor))
+    const divisorCap = Math.max(2, Math.min(10 ** factorDigits - 1, Math.floor(hi / 2)))
+    const divisorFloor = Math.min(divisorCap, factorDigits === 1 ? 2 : 10 ** (factorDigits - 1))
+    const divisor = ctx.rng.int(Math.min(divisorFloor, divisorCap), divisorCap)
+    // The dividend stays inside the chosen size, so a wide divisor shortens the quotient.
+    const maxQ = Math.max(2, Math.floor(hi / divisor))
+    const minQ = Math.min(maxQ, Math.max(2, Math.floor(lo / divisor)))
+    const quotient = ctx.rng.int(minQ, maxQ)
     const remainder = knobFlag(ctx, 'remain') ? ctx.rng.int(1, divisor - 1) : 0
     const dividend = quotient * divisor + remainder
     if (remainder) {
@@ -407,7 +472,7 @@ export function reducedMixed(numer: number, den: number) {
 }
 
 export function g4nfA(ctx: Ctx) {
-  const pool = [2, 3, 4, 5, 6, 8, 10, 12].filter((item) => item <= knobNum(ctx, 'den', 6))
+  const pool = densUpTo(knobNum(ctx, 'den', 6))
   const d = ctx.rng.pick(pool)
   const numer = ctx.rng.int(1, d - 1)
   if (ctx.mode === 'order') {
@@ -474,7 +539,8 @@ export function g4nfA(ctx: Ctx) {
 }
 
 export function g4nfB(ctx: Ctx) {
-  const d = ctx.rng.pick([3, 4, 5, 6, 8, 10, 12].filter((item) => item <= knobNum(ctx, 'den', 10)))
+  const denPool = densUpTo(knobNum(ctx, 'den', 10)).filter((item) => item >= 3)
+  const d = ctx.rng.pick(denPool.length ? denPool : [4])
   if (ctx.mode === 'mulwhole') {
     const whole = ctx.rng.int(2, 6)
     const numer = ctx.rng.int(1, d - 1)

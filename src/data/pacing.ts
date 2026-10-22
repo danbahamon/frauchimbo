@@ -107,6 +107,7 @@ export const PRESETS: Preset[] = [
     ['5.nbt.a', 2, 3, { mode: 'times' }],
     ['5.nbt.b', 2, 2, { mode: 'adddec' }],
     ['5.oa.a', 2, 2, { mode: 'eval' }],
+    ['5.nbt.c', 2, 3, { mode: 'chart' }],
   ]),
   preset(5, 11, 'Grade 5 · November', 'Klasse 5 · November', 'Grado 5 · noviembre', 'Whole-number power and decimal products.', 'Kraft mit ganzen Zahlen und Dezimalprodukten.', 'Fuerza con enteros y productos decimales.', [
     ['5.nbt.b', 2, 3, { mode: 'mul' }],
@@ -114,6 +115,7 @@ export const PRESETS: Preset[] = [
     ['5.nbt.b', 2, 3, { mode: 'muldec' }],
     ['5.oa.a', 2, 4, { mode: 'words' }],
     ['5.oa.b', 2, 3, { mode: 'ask' }],
+    ['5.nbt.b', 2, 3, { mode: 'head' }],
   ]),
   preset(5, 1, 'Grade 5 · January', 'Klasse 5 · Januar', 'Grado 5 · enero', 'Unlike denominators.', 'Ungleiche Nenner.', 'Denominadores distintos.', [
     ['5.nf.a', 2, 3, { mode: 'add' }],
@@ -136,6 +138,7 @@ export const PRESETS: Preset[] = [
     ['5.g.a', 2, 4, { mode: 'distance' }],
     ['5.g.b', 2, 3, { mode: 'statement' }],
     ['5.md.b', 2, 3, { mode: 'greater' }],
+    ['5.md.d', 2, 3, { mode: 'match' }],
   ]),
   preset(5, 6, 'Grade 5 · June', 'Klasse 5 · Juni', 'Grado 5 · junio', 'The year’s spiral, mixed on purpose.', 'Die Spirale des Jahres, absichtlich gemischt.', 'La espiral del año, mezclada a propósito.', [
     ['5.nf.a', 2, 3, { mode: 'add' }],
@@ -144,6 +147,7 @@ export const PRESETS: Preset[] = [
     ['5.md.c', 2, 3, { mode: 'volume' }],
     ['5.g.a', 2, 3, { mode: 'plot' }],
     ['5.oa.a', 2, 3, { mode: 'eval' }],
+    ['5.nbt.c', 2, 3, { mode: 'order' }],
   ]),
   preset(6, 9, 'Grade 6 · September', 'Klasse 6 · September', 'Grado 6 · septiembre', 'Ratios and common factors.', 'Verhältnisse und gemeinsame Faktoren.', 'Razones y factores comunes.', [
     ['6.rp.a', 2, 2, { mode: 'build' }],

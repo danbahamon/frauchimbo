@@ -1,29 +1,32 @@
 import { gcd, lcm, roundTo } from '../lib/math'
-import { ask, expression, frac, knobNum, L, n, scene, shuffleNotSorted, textChoice, type Ctx } from './shared'
+import { ask, densUpTo, expression, frac, knobNum, L, n, scene, shuffleNotSorted, textChoice, type Ctx } from './shared'
 import { fractionQuestion } from './bank4'
 import { equation } from './algebra'
 
 export function g6rp(ctx: Ctx) {
   const top = knobNum(ctx, 'max', 8)
-  const a = ctx.rng.int(2, top - 2)
-  const b = ctx.rng.int(2, top)
+  const a = ctx.rng.int(2, Math.max(2, top - 2))
+  const b = ctx.rng.int(2, Math.max(2, top))
   if (ctx.mode === 'build') {
-    return ask(ctx, L(`Build a ratio equal to ${n(a).en}:${n(b).en}.`, `Baue ein Verhältnis gleich ${n(a).de}:${n(b).de}.`, `Arma una razón igual a ${n(a).es}:${n(b).es}.`), { type: 'ratio', max: 16 }, { kind: 'ratio', a, b }, [
+    return ask(ctx, L(`Build a ratio equal to ${n(a).en}:${n(b).en}.`, `Baue ein Verhältnis gleich ${n(a).de}:${n(b).de}.`, `Arma una razón igual a ${n(a).es}:${n(b).es}.`), { type: 'ratio', max: Math.max(24, top * 3) }, { kind: 'ratio', a, b }, [
       L('Multiply both parts by the same number.', 'Multipliziere beide Teile mit derselben Zahl.', 'Multiplica ambas partes por el mismo número.'),
       L(`${n(a).en}:${n(b).en} is the simplest pair. Any equivalent pair counts.`, `${n(a).de}:${n(b).de} ist das kürzeste Paar. Jedes gleichwertige Paar zählt.`, `${n(a).es}:${n(b).es} es el par más simple. Cualquier par equivalente vale.`),
     ])
   }
   if (ctx.mode === 'unit') {
-    const hours = ctx.rng.int(2, 6)
-    const per = ctx.rng.int(8, 20)
+    const hours = ctx.rng.int(2, 8)
+    const per = ctx.rng.int(4, Math.max(4, knobNum(ctx, 'whole', 40)))
     return ask(ctx, L(`Pico flies ${n(per * hours).en} km in ${n(hours).en} hours. What is the speed in km per hour?`, `Pico fliegt ${n(per * hours).de} km in ${n(hours).de} Stunden. Wie groß ist die Geschwindigkeit in km pro Stunde?`, `Pico vuela ${n(per * hours).es} km en ${n(hours).es} horas. ¿Cuál es la velocidad en km por hora?`), { type: 'number' }, { kind: 'number', value: per }, [
       L('Divide distance by time.', 'Teile Strecke durch Zeit.', 'Divide la distancia entre el tiempo.'),
       L(`${n(per * hours).en} ÷ ${n(hours).en} = ${n(per).en}.`, `${n(per * hours).de} ÷ ${n(hours).de} = ${n(per).de}.`, `${n(per * hours).es} ÷ ${n(hours).es} = ${n(per).es}.`),
     ], scene('sky'))
   }
   if (ctx.mode === 'percent') {
-    const percent = ctx.rng.pick([10, 20, 25, 50])
-    const base = ctx.rng.pick([20, 40, 60, 80, 120])
+    const percentCap = Math.max(10, knobNum(ctx, 'whole', 50))
+    const percents = [10, 20, 25, 40, 50, 75].filter((item) => item <= percentCap)
+    const percent = ctx.rng.pick(percents.length ? percents : [10])
+    const bases = [20, 40, 60, 80, 100, 120, 160, 200, 240, 400].filter((item) => item <= Math.max(20, knobNum(ctx, 'whole', 80)))
+    const base = ctx.rng.pick(bases.length ? bases : [20])
     return ask(ctx, L(`What is ${n(percent).en}% of ${n(base).en}?`, `Wie viel sind ${n(percent).de} % von ${n(base).de}?`, `¿Cuánto es el ${n(percent).es} % de ${n(base).es}?`), { type: 'number', allowDecimal: true }, { kind: 'number', value: (percent * base) / 100, tolerance: 0.001 }, [
       L(`${n(percent).en}% = ${frac(0, percent, 100)}.`, `${n(percent).de} % = ${frac(0, percent, 100)}.`, `${n(percent).es} % = ${frac(0, percent, 100)}.`),
       L(`${frac(0, percent, 100)} × ${n(base).en} = ${n((percent * base) / 100).en}.`, `${frac(0, percent, 100)} × ${n(base).de} = ${n((percent * base) / 100).de}.`, `${frac(0, percent, 100)} × ${n(base).es} = ${n((percent * base) / 100).es}.`),
@@ -48,7 +51,7 @@ export function g6nsA(ctx: Ctx) {
   }
   if (ctx.mode === 'whole') {
     const whole = ctx.rng.int(2, 7)
-    const den = ctx.rng.pick([2, 3, 4, 5, 6, 8, 10, 12].filter((d) => d <= cap))
+    const den = ctx.rng.pick(densUpTo(cap))
     const numer = ctx.rng.int(1, den - 1)
     return fractionQuestion(ctx, whole * den, numer, L(`What is ${n(whole).en} ÷ ${frac(0, numer, den)}?`, `Wie viel ist ${n(whole).de} ÷ ${frac(0, numer, den)}?`, `¿Cuánto es ${n(whole).es} ÷ ${frac(0, numer, den)}?`), [
       L('Multiply by the reciprocal.', 'Multipliziere mit dem Kehrwert.', 'Multiplica por el recíproco.'),
@@ -113,7 +116,14 @@ export function g6nsC(ctx: Ctx) {
     ])
   }
   if (ctx.mode === 'order') {
-    const values = [-6, -1, 0, 4].map((base, index) => base + (index === 2 ? 0 : ctx.rng.int(0, 1)))
+    const values: number[] = []
+    let guard = 0
+    while (values.length < 4 && guard < 30) {
+      const next = ctx.rng.int(-span, span)
+      if (!values.includes(next)) values.push(next)
+      guard += 1
+    }
+    while (values.length < 4) values.push((values[values.length - 1] ?? 0) + values.length)
     const ids = values.map((value, index) => `${value}:${index}`)
     const correct = [...values].map((value, index) => ({ value, id: ids[index] })).sort((p, q) => p.value - q.value).map((item) => item.id)
     const shown = shuffleNotSorted(ids, correct, ctx.rng)
@@ -131,9 +141,10 @@ export function g6nsC(ctx: Ctx) {
 }
 
 export function g6eeA(ctx: Ctx) {
-  const x = ctx.rng.int(2, 8)
-  const a = ctx.rng.int(2, 6)
-  const b = ctx.rng.int(1, 9)
+  const cap = Math.max(2, knobNum(ctx, 'max', 9))
+  const x = ctx.rng.int(2, cap)
+  const a = ctx.rng.int(2, cap)
+  const b = ctx.rng.int(1, cap)
   if (ctx.mode === 'write') {
     const pack = textChoice(L(`${n(a).en}x + ${n(b).en}`, `${n(a).de}x + ${n(b).de}`, `${n(a).es}x + ${n(b).es}`), [
       L(`${n(a).en} + x + ${n(b).en}`, `${n(a).de} + x + ${n(b).de}`, `${n(a).es} + x + ${n(b).es}`),
@@ -174,9 +185,9 @@ export function g6eeB(ctx: Ctx) {
 }
 
 export function g6eeC(ctx: Ctx) {
-  const m = ctx.rng.int(2, knobNum(ctx, 'slope', 5))
-  const b = ctx.rng.int(0, 4)
-  const x = ctx.rng.int(1, 6)
+  const m = ctx.rng.int(1, Math.max(1, knobNum(ctx, 'slope', 5)))
+  const b = ctx.rng.int(0, Math.max(0, knobNum(ctx, 'intercept', 6)))
+  const x = ctx.rng.int(1, Math.max(1, knobNum(ctx, 'xup', 8)))
   const y = m * x + b
   if (ctx.mode === 'pair') {
     const pack = textChoice(L(`(${n(x).en}, ${n(y).en})`, `(${n(x).de}, ${n(y).de})`, `(${n(x).es}, ${n(y).es})`), [
@@ -197,8 +208,8 @@ export function g6eeC(ctx: Ctx) {
 export function g6g(ctx: Ctx) {
   const top = knobNum(ctx, 'max', 12)
   if (ctx.mode === 'triangle') {
-    const base = ctx.rng.int(4, top)
-    const height = ctx.rng.int(2, top - 2)
+    const base = ctx.rng.int(2, Math.max(2, top))
+    const height = ctx.rng.int(2, Math.max(2, top - 1))
     const area = (base * height) / 2
     return ask(ctx, L('What is the area of the triangle?', 'Wie groß ist der Flächeninhalt des Dreiecks?', '¿Cuál es el área del triángulo?'), { type: 'number', allowDecimal: true }, { kind: 'number', value: area, tolerance: 0.001 }, [
       L('Half of base times height.', 'Die Hälfte von Grundseite mal Höhe.', 'La mitad de base por altura.'),
@@ -206,16 +217,16 @@ export function g6g(ctx: Ctx) {
     ], { type: 'triangle', b: base, h: height })
   }
   if (ctx.mode === 'para') {
-    const base = ctx.rng.int(4, top)
-    const height = ctx.rng.int(3, top - 3)
+    const base = ctx.rng.int(2, Math.max(2, top))
+    const height = ctx.rng.int(2, Math.max(2, top - 1))
     return ask(ctx, L('What is the area of the parallelogram?', 'Wie groß ist der Flächeninhalt des Parallelogramms?', '¿Cuál es el área del paralelogramo?'), { type: 'number' }, { kind: 'number', value: base * height }, [
       L('Use base × perpendicular height.', 'Nimm Grundseite × senkrechte Höhe.', 'Usa base × altura perpendicular.'),
       L(`${n(base).en} × ${n(height).en} = ${n(base * height).en}.`, `${n(base).de} × ${n(height).de} = ${n(base * height).de}.`, `${n(base).es} × ${n(height).es} = ${n(base * height).es}.`),
     ], { type: 'shape', shape: 'parallelogram' })
   }
-  const l = ctx.rng.int(2, top - 4)
-  const w = ctx.rng.int(2, top - 6)
-  const h = ctx.rng.int(2, top - 7)
+  const l = ctx.rng.int(2, Math.max(2, top - 2))
+  const w = ctx.rng.int(2, Math.max(2, top - 3))
+  const h = ctx.rng.int(2, Math.max(2, top - 4))
   if (ctx.mode === 'volume') {
     return ask(ctx, L('What is the volume?', 'Wie groß ist das Volumen?', '¿Cuál es el volumen?'), { type: 'number' }, { kind: 'number', value: l * w * h }, [
       L('Length × width × height.', 'Länge × Breite × Höhe.', 'Largo × ancho × alto.'),

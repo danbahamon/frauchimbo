@@ -4,15 +4,25 @@ import type { KnobValues, Locale, Skill } from '../lib/types'
 
 // The things a problem type can change: ranges, switches, and choices, each with a short hint.
 // A row that does nothing for the chosen problem type stays hidden, so only real choices show.
-export function Variables({ skill, values, locale, onChange }: { skill: Skill; values: KnobValues; locale: Locale; onChange: (next: KnobValues) => void }) {
+// `hideIds` keeps a choice (usually the kind of problem) fixed, because that choice is the card itself.
+export function Variables({ skill, values, locale, onChange, resetDifficulty = 3, hideIds = [], showIntro = true }: { skill: Skill; values: KnobValues; locale: Locale; onChange: (next: KnobValues) => void; resetDifficulty?: number; hideIds?: string[]; showIntro?: boolean }) {
   const visible = skill.knobs.filter((knob) => {
+    if (hideIds.includes(knob.id)) return false
     if (knob.kind === 'select' && knob.options.length < 2) return false
     if (!knob.when) return true
     return knob.when.in.includes(String(values[knob.when.id]))
   })
+  const reset = () => {
+    const next = defaultKnobs(skill, resetDifficulty)
+    for (const id of hideIds) {
+      if (id in values) next[id] = values[id]
+    }
+    onChange(next)
+  }
+  if (!showIntro && visible.length === 0) return null
   return (
     <div className="variables">
-      <p className="fine variables-sub">{t(locale, 'vars.sub')}</p>
+      {showIntro ? <p className="fine variables-sub">{t(locale, 'vars.sub')}</p> : null}
       {visible.length === 0 ? <p className="muted">{t(locale, 'vars.none')}</p> : null}
       {visible.map((knob) => {
         const label = tx(locale, knob.label)
@@ -73,7 +83,7 @@ export function Variables({ skill, values, locale, onChange }: { skill: Skill; v
         )
       })}
       <div className="row">
-        <button type="button" className="text-btn" onClick={() => onChange(defaultKnobs(skill, 3))}>{t(locale, 'vars.reset')}</button>
+        <button type="button" className="text-btn" onClick={reset}>{t(locale, 'vars.reset')}</button>
       </div>
     </div>
   )

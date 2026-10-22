@@ -51,9 +51,30 @@ export function roundTo(n: number, places: number) {
   return Math.round((n + Number.EPSILON) * p) / p
 }
 
+function roundPowerOfTen(abs: number, place: number) {
+  const zeros = Math.round(Math.log10(place))
+  if (10 ** zeros !== place) return null
+  if (zeros <= 0) return abs
+  if (abs < place) return abs * 2 >= place ? place : 0
+  const text = String(abs)
+  const head = text.slice(0, text.length - zeros)
+  const tail = text.slice(text.length - zeros)
+  const next = Number(head) + (tail[0] >= '5' ? 1 : 0)
+  return next * place
+}
+
 export function roundHalfUp(n: number, place: number) {
   const sign = n < 0 ? -1 : 1
-  return (sign * Math.round(Math.abs(n) / place)) * place
+  const abs = Math.abs(n)
+  // Digit strings stay exact. Dividing a 15-digit number by 100 in floating point can lose the remainder.
+  if (Number.isSafeInteger(abs) && Number.isInteger(place) && place >= 1) {
+    const rounded = roundPowerOfTen(abs, place)
+    if (rounded != null && Number.isSafeInteger(rounded)) return sign * rounded
+    const q = Math.floor(abs / place)
+    const rem = abs - q * place
+    return sign * (q + (rem * 2 >= place ? 1 : 0)) * place
+  }
+  return sign * Math.round(abs / place) * place
 }
 
 export function fractionValue(whole: number, n: number, d: number) {

@@ -1,15 +1,27 @@
-import { roundTo, simplify } from '../lib/math'
+import { gcd, roundTo, simplify } from '../lib/math'
 import { ask, expression, familyOf, frac, knobNum, L, n, textChoice, type Ctx } from './shared'
 import { fractionQuestion } from './bank4'
 import { equation } from './algebra'
 import { dataSet } from './bank6'
 
+function priced(ctx: Ctx) {
+  const price = Math.max(20, knobNum(ctx, 'price', 80))
+  const rateCap = Math.max(5, knobNum(ctx, 'rate', 25))
+  const rates = [5, 10, 15, 20, 25, 40, 50].filter((rate) => rate <= rateCap)
+  const rate = ctx.rng.pick(rates.length ? rates : [10])
+  const unit = 100 / gcd(rate, 100)
+  const steps = Math.max(1, Math.floor(price / unit))
+  const start = unit * ctx.rng.int(1, steps)
+  return { rate, start, price }
+}
+
 export function g7rp(ctx: Ctx) {
   if (ctx.mode === 'change') {
-    const start = ctx.rng.pick([40, 50, 80, 100])
+    const deal = priced(ctx)
+    const start = deal.start
     const up = ctx.rng.chance(0.5)
-    const next = up ? start + start / 4 : start - start / 5
-    const percent = up ? 25 : 20
+    const percent = deal.rate
+    const next = up ? start + (start * percent) / 100 : start - (start * percent) / 100
     return ask(
       ctx,
       up
@@ -24,8 +36,9 @@ export function g7rp(ctx: Ctx) {
     )
   }
   if (ctx.mode === 'tax') {
-    const price = ctx.rng.pick([20, 30, 40, 50])
-    const rate = ctx.rng.pick([5, 10, 15])
+    const deal = priced(ctx)
+    const price = deal.start
+    const rate = deal.rate
     const extra = roundTo((price * rate) / 100, 2)
     return ask(
       ctx,
@@ -39,9 +52,10 @@ export function g7rp(ctx: Ctx) {
     )
   }
   if (ctx.mode === 'proportion') {
-    const a = ctx.rng.int(2, 6)
-    const b = ctx.rng.int(3, 9)
-    const k = ctx.rng.int(2, 6)
+    const kMax = Math.max(2, Math.min(20, Math.round(knobNum(ctx, 'price', 40) / 10)))
+    const a = ctx.rng.int(2, 12)
+    const b = ctx.rng.int(2, 12)
+    const k = ctx.rng.int(2, kMax)
     return ask(
       ctx,
       L(`${n(a).en} / ${n(b).en} = ${n(a * k).en} / x. What is x?`, `${n(a).de} / ${n(b).de} = ${n(a * k).de} / x. Wie groß ist x?`, `${n(a).es} / ${n(b).es} = ${n(a * k).es} / x. ¿Cuánto vale x?`),
@@ -53,8 +67,9 @@ export function g7rp(ctx: Ctx) {
       ],
     )
   }
-  const percent = ctx.rng.pick([15, 20, 25, 40])
-  const base = ctx.rng.pick([40, 60, 80, 120])
+  const deal = priced(ctx)
+  const percent = deal.rate
+  const base = deal.start
   return ask(
     ctx,
     L(`What is ${n(percent).en}% of ${n(base).en}?`, `Wie viel sind ${n(percent).de} % von ${n(base).de}?`, `¿Cuánto es el ${n(percent).es} % de ${n(base).es}?`),
@@ -133,8 +148,8 @@ export function g7ns(ctx: Ctx) {
 
 export function g7eeA(ctx: Ctx) {
   const top = knobNum(ctx, 'max', 8)
-  const a = ctx.rng.int(2, top - 2)
-  const b = ctx.rng.int(2, top)
+  const a = ctx.rng.int(2, Math.max(2, top - 2))
+  const b = ctx.rng.int(2, Math.max(2, top))
   if (ctx.mode === 'factor') {
     const pack = textChoice(L(`${n(a).en}(x + ${n(b).en})`, `${n(a).de}(x + ${n(b).de})`, `${n(a).es}(x + ${n(b).es})`), [
       L(`${n(a).en}(x + ${n(a * b).en})`, `${n(a).de}(x + ${n(a * b).de})`, `${n(a).es}(x + ${n(a * b).es})`),
@@ -157,7 +172,8 @@ export function g7eeA(ctx: Ctx) {
 
 export function g7eeB(ctx: Ctx) {
   if (ctx.mode === 'ineq') {
-    const boundary = ctx.rng.int(3, 8)
+    const cap = Math.max(4, knobNum(ctx, 'max', 8))
+    const boundary = ctx.rng.int(3, cap)
     const pack = textChoice(n(boundary + 2), [n(boundary), n(boundary - 1), n(0)], ctx.rng)
     return ask(ctx, L(`Which value solves x − 2 > ${n(boundary - 2).en}?`, `Welcher Wert löst x − 2 > ${n(boundary - 2).de}?`, `¿Qué valor resuelve x − 2 > ${n(boundary - 2).es}?`), { type: 'choice', options: pack.options }, pack.answer, [
       L(`Add 2: x > ${n(boundary).en}.`, `Addiere 2: x > ${n(boundary).de}.`, `Suma 2: x > ${n(boundary).es}.`),

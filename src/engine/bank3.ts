@@ -7,6 +7,7 @@ import {
   familyOf,
   frac,
   knobBool,
+  densUpTo,
   knobFlag,
   knobNum,
   L,
@@ -37,10 +38,13 @@ function addWithin(ctx: Ctx, digits: number, cap?: number) {
   let a = ctx.rng.int(lo, hi)
   let b = ctx.rng.int(lo, hi)
   if (cap) {
-    // Both addends stay small enough that their sum is at or under the cap. A cap of 1,000 gives the classic 120 to 700 range.
-    const low = Math.min(120, Math.floor(cap / 5))
-    a = ctx.rng.int(low, Math.max(low, Math.min(700, cap - 80)))
-    b = ctx.rng.int(Math.min(40, Math.floor(cap / 4)), Math.max(10, cap - a))
+    // Both addends stay small enough that their sum is at or under the cap, and they grow when the cap does.
+    const limit = Math.max(30, cap)
+    const low = Math.max(10, Math.floor(limit / 8))
+    const aHi = Math.max(low, limit - low)
+    a = ctx.rng.int(low, aHi)
+    const bHi = Math.max(low, limit - a)
+    b = ctx.rng.int(Math.min(low, bHi), bHi)
   }
   return { a, b, sum: a + b }
 }
@@ -216,16 +220,23 @@ export function g3oaD(ctx: Ctx) {
 
 export function g3nbt(ctx: Ctx) {
   if (ctx.mode === 'round') {
-    const cap = knobNum(ctx, 'within', 1000)
-    // Hundreds need room, so below 300 the rounding is to the nearest ten.
-    const place = cap >= 300 ? ctx.rng.pick([10, 100]) : 10
-    let value = ctx.rng.int(Math.min(120, Math.floor(cap / 8)), cap - 20)
+    const cap = Math.max(40, knobNum(ctx, 'within', 1000))
+    // Larger caps unlock thousands and ten thousands. Below 300, only tens have room.
+    const menu = [10, 100, 1000, 10000, 100000].filter((place) => place * 10 <= cap)
+    const place = ctx.rng.pick(menu.length ? menu : [10])
+    let value = ctx.rng.int(Math.max(place, Math.floor(cap / 8)), Math.max(place + 1, cap - 1))
     const digit = Math.floor(value / (place / 10)) % 10
     if (digit === 5) value += 1
     const rounded = roundHalfUp(value, place)
     const placeName = place === 10
       ? L('ten', 'Zehner', 'decena')
-      : L('hundred', 'Hunderter', 'centena')
+      : place === 100
+        ? L('hundred', 'Hunderter', 'centena')
+        : place === 1000
+          ? L('thousand', 'Tausender', 'millar')
+          : place === 10000
+            ? L('ten thousand', 'Zehntausender', 'decena de millar')
+            : L('hundred thousand', 'Hunderttausender', 'centena de millar')
     return ask(
       ctx,
       L(`Round ${n(value).en} to the nearest ${placeName.en}.`, `Runde ${n(value).de} auf den nächsten ${placeName.de}.`, `Redondea ${n(value).es} a la ${placeName.es} más cercana.`),
@@ -242,7 +253,7 @@ export function g3nbt(ctx: Ctx) {
     )
   }
   if (ctx.mode === 'times10') {
-    const a = ctx.rng.int(2, 9)
+    const a = ctx.rng.int(2, Math.max(2, knobNum(ctx, 'by', 9)))
     const tens = ctx.rng.int(1, 9) * 10
     return ask(
       ctx,
@@ -256,12 +267,12 @@ export function g3nbt(ctx: Ctx) {
       expression([{ t: 'v', value: a }, { t: 'op', v: '×' }, { t: 'v', value: tens }]),
     )
   }
-  const cap = knobNum(ctx, 'within', 1000)
+  const cap = Math.max(40, knobNum(ctx, 'within', 1000))
   const pack = addWithin(ctx, 3, cap)
   if (ctx.mode === 'sub') {
-    const top = Math.min(400, Math.floor(cap * 0.4))
-    const a = ctx.rng.int(top, cap - 20)
-    const b = ctx.rng.int(Math.min(120, Math.floor(top / 3)), a - 15)
+    const a = ctx.rng.int(Math.max(30, Math.floor(cap / 3)), Math.max(31, cap))
+    const bHi = Math.max(10, a - 1)
+    const b = ctx.rng.int(Math.min(Math.max(10, Math.floor(a / 8)), bHi), bHi)
     return ask(
       ctx,
       L(`Find the difference.`, `Bestimme die Differenz.`, `Halla la diferencia.`),
@@ -288,9 +299,7 @@ export function g3nbt(ctx: Ctx) {
 }
 
 function denom(ctx: Ctx) {
-  const cap = knobNum(ctx, 'den', 6)
-  const options = [2, 3, 4, 6, 8].filter((d) => d <= cap)
-  return ctx.rng.pick(options.length ? options : [2, 4])
+  return ctx.rng.pick(densUpTo(knobNum(ctx, 'den', 6)))
 }
 
 export function g3nf(ctx: Ctx) {
@@ -458,16 +467,121 @@ const CHART_LABELS: Localized[][] = [
   [L('Snails', 'Schnecken', 'Caracoles'), L('Birds', 'Vögel', 'Pájaros'), L('Otters', 'Otter', 'Nutrias')],
   [L('Shells', 'Muscheln', 'Conchas'), L('Stones', 'Steine', 'Piedras'), L('Leaves', 'Blätter', 'Hojas')],
   [L('Bread', 'Brot', 'Pan'), L('Pears', 'Birnen', 'Peras'), L('Honey', 'Honig', 'Miel')],
+  [L('Volkswagen', 'Volkswagen', 'Volkswagen'), L('Toyota', 'Toyota', 'Toyota'), L('Kia', 'Kia', 'Kia')],
+  [L('Chevrolet', 'Chevrolet', 'Chevrolet'), L('Toyota', 'Toyota', 'Toyota'), L('Volkswagen', 'Volkswagen', 'Volkswagen')],
 ]
+
+const CHART_COLORS = ['#e25b45', '#0f766e', '#e0a100']
+
+function chartCeiling(tallest: number) {
+  const marks = [5, 8, 10, 12, 20, 40, 50, 100, 200, 400, 500, 800, 1000]
+  return marks.find((mark) => mark >= tallest) ?? tallest
+}
+
+function distinctHeights(ctx: Ctx, count: number, top: number) {
+  const values: number[] = []
+  let guard = 0
+  while (values.length < count && guard < 40) {
+    const next = ctx.rng.int(1, Math.max(1, top))
+    if (!values.includes(next)) values.push(next)
+    guard += 1
+  }
+  while (values.length < count) values.push(values.length + 1)
+  return values
+}
 
 export function g3mdB(ctx: Ctx) {
   const labels = ctx.rng.pick(CHART_LABELS)
-  const values = [ctx.rng.int(2, 8), ctx.rng.int(1, 9), ctx.rng.int(2, 7)]
-  const axisMax = values.some((v) => v > 8) ? 10 : 8
+  const top = Math.max(4, knobNum(ctx, 'top', 12))
+  if (ctx.mode === 'match') {
+    // Three bars in a row, spaced by the same gap. The two shorter ones can each grow by that gap and match the next bar.
+    const gap = top >= 80 ? ctx.rng.int(2, 6) * 10 : Math.max(1, ctx.rng.int(1, Math.max(1, Math.floor(top / 6))))
+    const baseHi = Math.max(gap, top - 2 * gap)
+    const base = ctx.rng.int(Math.min(gap, baseHi), baseHi)
+    const paired = ctx.rng.shuffle([
+      { label: labels[0], value: base },
+      { label: labels[1], value: base + gap },
+      { label: labels[2], value: base + 2 * gap },
+    ])
+    const values = paired.map((item) => item.value)
+    const names = paired.map((item) => item.label)
+    const growers = paired.filter((item) => paired.some((other) => other.value === item.value + gap))
+    const pairName = (a: Localized, b: Localized) => {
+      const ordered = [a, b].sort((left, right) => left.en.localeCompare(right.en))
+      return L(`${ordered[0].en} or ${ordered[1].en}`, `${ordered[0].de} oder ${ordered[1].de}`, `${ordered[0].es} o ${ordered[1].es}`)
+    }
+    const correct = pairName(growers[0].label, growers[1].label)
+    const wrongs = [
+      pairName(paired[0].label, paired[1].label),
+      pairName(paired[0].label, paired[2].label),
+      pairName(paired[1].label, paired[2].label),
+    ].filter((label) => label.en !== correct.en)
+    const pack = textChoice(correct, wrongs.length ? wrongs : [pairName(paired[0].label, paired[2].label)], ctx.rng)
+    const axisMax = chartCeiling(Math.max(...values))
+    return ask(
+      ctx,
+      L(
+        `One bar grows by ${n(gap).en}. Afterwards two bars are the same height. Which bar could it be? Both possibilities count.`,
+        `Eine Säule wird um ${n(gap).de} höher. Danach sind zwei Säulen gleich hoch. Welche Säule kann es sein? Beide Möglichkeiten gelten.`,
+        `Una barra aumenta en ${n(gap).es}. Después, dos barras quedan a la misma altura. ¿Cuál barra puede ser? Valen las dos posibilidades.`,
+      ),
+      { type: 'choice', options: pack.options },
+      pack.answer,
+      [
+        L(
+          `Add ${n(gap).en} to each bar and see which new height already exists.`,
+          `Addiere ${n(gap).de} zu jeder Säule und schau, welche neue Höhe es schon gibt.`,
+          `Suma ${n(gap).es} a cada barra y mira qué altura nueva ya existe.`,
+        ),
+        L(
+          `${growers[0].label.en} ${n(growers[0].value).en} + ${n(gap).en} matches another bar, and so does ${growers[1].label.en}.`,
+          `${growers[0].label.de} ${n(growers[0].value).de} + ${n(gap).de} trifft eine andere Säule, und ${growers[1].label.de} ebenso.`,
+          `${growers[0].label.es} ${n(growers[0].value).es} + ${n(gap).es} coincide con otra barra, y ${growers[1].label.es} también.`,
+        ),
+      ],
+      { type: 'chart', labels: names, values, colors: CHART_COLORS, axisMax, unit: L('count', 'Anzahl', 'cantidad') },
+    )
+  }
+  if (ctx.mode === 'most') {
+    const values = distinctHeights(ctx, 3, top)
+    const axisMax = chartCeiling(Math.max(...values))
+    const ranked = values.map((value, index) => ({ value, index })).sort((a, b) => a.value - b.value)
+    const least = ranked[0]
+    const most = ranked[ranked.length - 1]
+    const askMost = ctx.rng.chance(0.5)
+    const winner = askMost ? most : least
+    const pack = textChoice(labels[winner.index], labels.filter((_, index) => index !== winner.index), ctx.rng)
+    return ask(
+      ctx,
+      askMost
+        ? L('Which bar is the tallest?', 'Welche Säule ist am höchsten?', '¿Cuál barra es la más alta?')
+        : L('Which bar is the shortest?', 'Welche Säule ist am niedrigsten?', '¿Cuál barra es la más baja?'),
+      { type: 'choice', options: pack.options },
+      pack.answer,
+      [
+        L('Compare the three heights. The question asks for one end of that list.', 'Vergleiche die drei Höhen. Die Frage meint ein Ende dieser Liste.', 'Compara las tres alturas. La pregunta pide un extremo de esa lista.'),
+        L(
+          `${labels[winner.index].en} reaches ${n(winner.value).en}.`,
+          `${labels[winner.index].de} reicht bis ${n(winner.value).de}.`,
+          `${labels[winner.index].es} llega a ${n(winner.value).es}.`,
+        ),
+      ],
+      { type: 'chart', labels, values, colors: CHART_COLORS, axisMax, unit: L('count', 'Anzahl', 'cantidad') },
+    )
+  }
+  const step = top > 100 ? 20 : top > 40 ? 5 : 1
+  const slots = Math.max(1, Math.floor(top / step))
+  const values = ctx.mode === 'build'
+    ? [0, 1, 2].map(() => ctx.rng.int(1, slots) * step)
+    : distinctHeights(ctx, 3, top)
+  const axisMax = chartCeiling(Math.max(...values))
   if (ctx.mode === 'build') {
     const teal = PALETTE.find((color) => color.id === 'teal')?.hex ?? '#0f766e'
     const tallest = Math.max(...values)
-    const fit = [5, 8, 10, 12].find((axis) => axis >= tallest) ?? 12
+    const classic = top <= 12
+    const choices = classic ? [5, 8, 10, 12] : [tallest, chartCeiling(Math.ceil(tallest * 1.25)), chartCeiling(Math.ceil(tallest * 1.6))]
+    const axisChoices = [...new Set(choices.map((choice) => Math.max(step, choice)))]
+    const fit = axisChoices.find((axis) => axis >= tallest) ?? axisChoices[axisChoices.length - 1]
     return ask(
       ctx,
       L(
@@ -475,20 +589,19 @@ export function g3mdB(ctx: Ctx) {
         `${labels.map((label, index) => `${label.de}: ${n(values[index]).de}`).join(' · ')}. Baue das Säulendiagramm. Färbe die mittlere Säule petrol und wähle eine passende Skala.`,
         `${labels.map((label, index) => `${label.es}: ${n(values[index]).es}`).join(' · ')}. Construye la gráfica. Colorea la barra del medio verde azulado y elige una escala que quepa.`,
       ),
-      { type: 'chart-build', labels, axisChoices: [5, 8, 10, 12], maxValue: 12 },
+      { type: 'chart-build', labels, axisChoices, maxValue: Math.max(tallest, ...axisChoices), step },
       { kind: 'chart', values, colors: [null, teal, null], axisMax: fit, axisAtLeast: tallest },
       [
         L('Each bar’s height is the count in the table. The scale must reach the tallest bar.', 'Die Höhe jeder Säule ist die Anzahl in der Tabelle. Die Skala muss die höchste Säule erreichen.', 'La altura de cada barra es la cantidad de la tabla. La escala debe alcanzar la barra más alta.'),
         L(`The values are ${values.map((v) => n(v).en).join(', ')}.`, `Die Werte sind ${values.map((v) => n(v).de).join(', ')}.`, `Los valores son ${values.map((v) => n(v).es).join(', ')}.`),
       ],
-      undefined,
     )
   }
   let i = 0
   let j = 1
   if (values[1] > values[i]) i = 1
   if (values[2] > values[i]) i = 2
-  j = [0, 1, 2].find((index) => index !== i) ?? 0
+  j = [0, 1, 2].find((index) => index !== i && values[index] !== values[i]) ?? 0
   const diff = values[i] - values[j]
   const askMore = ctx.rng.chance(0.5)
   if (askMore) {
@@ -505,7 +618,7 @@ export function g3mdB(ctx: Ctx) {
         L(`Read the two bars: ${n(values[i]).en} and ${n(values[j]).en}.`, `Lies die beiden Säulen: ${n(values[i]).de} und ${n(values[j]).de}.`, `Lee las dos barras: ${n(values[i]).es} y ${n(values[j]).es}.`),
         L(`The difference is ${n(Math.abs(diff)).en}.`, `Die Differenz ist ${n(Math.abs(diff)).de}.`, `La diferencia es ${n(Math.abs(diff)).es}.`),
       ],
-      { type: 'chart', labels, values, colors: ['#e25b45', '#0f766e', '#e0a100'], axisMax, unit: L('count', 'Anzahl', 'cantidad') },
+      { type: 'chart', labels, values, colors: CHART_COLORS, axisMax, unit: L('count', 'Anzahl', 'cantidad') },
     )
   }
   return ask(
@@ -517,7 +630,7 @@ export function g3mdB(ctx: Ctx) {
       L('Match the bar to its label, then read the height against the axis.', 'Ordne die Säule ihrer Beschriftung zu und lies die Höhe an der Achse ab.', 'Empareja la barra con su etiqueta y lee la altura en el eje.'),
       L(`The bar reaches ${n(values[i]).en}.`, `Die Säule reicht bis ${n(values[i]).de}.`, `La barra llega a ${n(values[i]).es}.`),
     ],
-    { type: 'chart', labels, values, colors: ['#e25b45', '#0f766e', '#e0a100'], axisMax, unit: L('count', 'Anzahl', 'cantidad') },
+    { type: 'chart', labels, values, colors: CHART_COLORS, axisMax, unit: L('count', 'Anzahl', 'cantidad') },
   )
 }
 

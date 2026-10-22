@@ -3,7 +3,7 @@ import { getSkill } from '../data/skills'
 import { makeCtx } from './shared'
 import { g3g, g3mdA, g3mdB, g3mdC, g3mdD, g3nbt, g3nf, g3oaA, g3oaB, g3oaC, g3oaD } from './bank3'
 import { g4g, g4mdA, g4mdB, g4mdC, g4nbtA, g4nbtB, g4nfA, g4nfB, g4nfC, g4oaA, g4oaB, g4oaC } from './bank4'
-import { g5gA, g5gB, g5mdA, g5mdB, g5mdC, g5nbtA, g5nbtB, g5nfA, g5nfB, g5oaA, g5oaB } from './bank5'
+import { g5gA, g5gB, g5mdA, g5mdB, g5mdC, g5nbtA, g5nbtB, g5nbtC, g5nfA, g5nfB, g5oaA, g5oaB } from './bank5'
 import { g6eeA, g6eeB, g6eeC, g6g, g6nsA, g6nsB, g6nsC, g6rp, g6spA, g6spB } from './bank6'
 import { g7eeA, g7eeB, g7gA, g7gB, g7ns, g7rp, g7spA, g7spB, g7spC } from './bank7'
 import type { Ctx } from './shared'
@@ -37,11 +37,13 @@ const BANK: Record<string, (ctx: Ctx) => Question> = {
   '5.oa.b': g5oaB,
   '5.nbt.a': g5nbtA,
   '5.nbt.b': g5nbtB,
+  '5.nbt.c': g5nbtC,
   '5.nf.a': g5nfA,
   '5.nf.b': g5nfB,
   '5.md.a': g5mdA,
   '5.md.b': g5mdB,
   '5.md.c': g5mdC,
+  '5.md.d': g3mdB,
   '5.g.a': g5gA,
   '5.g.b': g5gB,
   '6.rp.a': g6rp,

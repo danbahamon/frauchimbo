@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, ty
 import type { Answer, Locale, Response } from '../lib/types'
 import { PALETTE } from '../lib/types'
 import { decimalKey, t, tx } from '../lib/i18n'
+import { formatNumber } from '../lib/math'
 import { MathText } from './MathText'
 import { ShadeBar } from './ShadeBar'
 import { ClockFace, PlaneGrid, ShapeFig, planeMap } from './visuals'
@@ -47,14 +48,21 @@ function useEmit(onChange: (answer: Answer | null) => void) {
 }
 
 // Typed text where only the newest character pops in. Keying it by length replays the pop on every key press.
+// One wrapper keeps the whole string a single box, so a grid or flex parent cannot drop the last digit onto its own row.
 function Typed({ text, empty = ' ' }: { text: string; empty?: string }) {
   if (!text) return <>{empty}</>
   return (
-    <>
+    <span className="typed">
       {text.slice(0, -1)}
       <span key={text.length} className="digit-pop">{text.slice(-1)}</span>
-    </>
+    </span>
   )
+}
+
+function longMark(length: number) {
+  if (length >= 13) return '2'
+  if (length >= 9) return '1'
+  return undefined
 }
 
 function parseNumeric(text: string) {
@@ -91,7 +99,8 @@ function applyNumber(current: string, key: string) {
   if (key === 'back') return current.slice(0, -1)
   if (key === 'sign') return current.startsWith('-') ? current.slice(1) : `-${current}`
   if (key === 'dec') return current.includes('.') ? current : `${current || '0'}.`
-  if (current.replace('-', '').replace('.', '').length >= 8) return current
+  // Fifteen places is the longest whole number the games build, plus one digit when rounding climbs to the next place.
+  if (current.replace('-', '').replace('.', '').length >= 16) return current
   return `${current}${key}`
 }
 
@@ -108,7 +117,7 @@ function NumberWidget({ response, locale, onChange, initial }: { response: Extra
   const shown = text.replace('.', decimalKey(locale))
   return (
     <div>
-      <div className="entry"><Typed text={shown} /></div>
+      <div className="entry num" data-long={longMark(shown.length)}><Typed text={shown} /></div>
       <Pad locale={locale} allowDecimal={response.allowDecimal} allowNegative={response.allowNegative} onKey={push} />
     </div>
   )
@@ -252,11 +261,13 @@ function LineWidget({ response, locale, onChange, initial }: { response: Extract
       onPointerDown={(event) => setFrom(event.clientX, event.currentTarget)}
       onPointerMove={(event) => { if (event.buttons) setFrom(event.clientX, event.currentTarget) }}>
       <line x1="20" y1="40" x2="300" y2="40" stroke="currentColor" strokeWidth="3" />
+      <text x="20" y="16" textAnchor="start" fontSize="11">{Number.isInteger(response.min) ? formatNumber(locale, response.min) : String(response.min)}</text>
+      <text x="300" y="16" textAnchor="end" fontSize="11">{Number.isInteger(response.max) ? formatNumber(locale, response.max) : String(response.max)}</text>
       {/* The marker glides to each new place. Before the first tap it is a dashed ring at the start, so the line clearly needs a tap. */}
       <g className="nl-track" style={{ transform: `translateX(${x - 20}px)` }}>
         <circle cx="20" cy="40" r="12" className={value == null ? 'nl-marker unset' : 'nl-marker'} />
       </g>
-      <text x="160" y="72" textAnchor="middle" fontSize="14">{value == null ? t(locale, 'widget.tapLine') : value}</text>
+      <text x="160" y="72" textAnchor="middle" fontSize="14">{value == null ? t(locale, 'widget.tapLine') : Number.isInteger(value) ? formatNumber(locale, value) : value}</text>
     </svg>
   )
 }
@@ -368,7 +379,8 @@ function ChartWidget({ response, locale, onChange, initial }: { response: Extrac
   const paint = (index: number, clientY: number, element: HTMLElement) => {
     const rect = element.getBoundingClientRect()
     const ratio = Math.min(1, Math.max(0, (rect.bottom - clientY) / rect.height))
-    const value = Math.round(ratio * axis)
+    const step = response.step && response.step > 0 ? response.step : 1
+    const value = Math.round((ratio * axis) / step) * step
     setValues((current) => current.map((item, i) => (i === index ? Math.min(response.maxValue, value) : item)))
     setActive(index)
   }
@@ -403,6 +415,14 @@ function ChartWidget({ response, locale, onChange, initial }: { response: Extrac
         </div>
       </div>
       <div className="row">
+        <button type="button" className="icon-btn" aria-label={t(locale, 'widget.lower')} onClick={() => {
+          const step = response.step && response.step > 0 ? response.step : 1
+          setValues((current) => current.map((item, index) => index === active ? Math.max(0, item - step) : item))
+        }}>−</button>
+        <button type="button" className="icon-btn" aria-label={t(locale, 'widget.raise')} onClick={() => {
+          const step = response.step && response.step > 0 ? response.step : 1
+          setValues((current) => current.map((item, index) => index === active ? Math.min(response.maxValue, item + step) : item))
+        }}>+</button>
         {PALETTE.map((color) => (
           <button key={color.id} type="button" className={colors[active] === color.hex ? 'swatch on' : 'swatch'} style={{ background: color.hex }} onClick={() => setColors((current) => current.map((item, index) => index === active ? color.hex : item))} aria-label={color.id} />
         ))}
@@ -464,8 +484,19 @@ function RatioWidget({ response, locale, onChange, initial }: { response: Extrac
 function DigitsWidget({ response, locale, onChange, initial }: { response: Extract<Response, { type: 'digits' }>; locale: Locale; onChange: (answer: Answer | null) => void; initial: number[] | null }) {
   const [digits, setDigits] = useState(initial ?? response.columns.map(() => 0))
   const [active, setActive] = useState(0)
+  const chart = useRef<HTMLDivElement>(null)
   const emit = useEmit(onChange)
   useEffect(() => { emit.current({ kind: 'digits', digits }) }, [digits, emit])
+  useEffect(() => {
+    const scroller = chart.current
+    const cell = scroller?.querySelector<HTMLElement>('[data-on="true"]')
+    if (!scroller || !cell) return
+    const box = scroller.getBoundingClientRect()
+    const item = cell.getBoundingClientRect()
+    if (item.left < box.left - 1 || item.right > box.right + 1) {
+      scroller.scrollBy({ left: item.left - box.left - (box.width - item.width) / 2, behavior: 'smooth' })
+    }
+  }, [active])
   const push = (key: string) => {
     if (!/^\d$/.test(key)) return
     setDigits((current) => current.map((digit, index) => index === active ? Number(key) : digit))
@@ -474,11 +505,11 @@ function DigitsWidget({ response, locale, onChange, initial }: { response: Extra
   useKeys(push, true)
   return (
     <div>
-      <div className="row" style={{ justifyContent: 'center' }}>
+      <div className="place-chart" ref={chart}>
         {response.columns.map((column, index) => (
-          <button key={index} type="button" className="choice" data-on={active === index} onClick={() => setActive(index)}>
+          <button key={index} type="button" className="place-col" data-on={active === index} onClick={() => setActive(index)}>
             <small>{tx(locale, column)}</small>
-            <div className="score-num">{digits[index]}</div>
+            <span className="place-digit">{digits[index]}</span>
           </button>
         ))}
       </div>
@@ -502,7 +533,7 @@ function MultiWidget({ response, locale, onChange, initial }: { response: Extrac
       else if (key === 'clear') next = ''
       else if (key === 'sign') next = prev.startsWith('-') ? prev.slice(1) : `-${prev}`
       else if (key === 'dec') next = prev.includes('.') ? prev : `${prev || '0'}.`
-      else if (/^\d$/.test(key)) next = `${prev}${key}`
+      else if (/^\d$/.test(key)) next = prev.replace('-', '').replace('.', '').length >= 16 ? prev : `${prev}${key}`
       const merged = { ...current, [active]: next }
       const parts: Record<string, number> = {}
       let ready = true
@@ -518,13 +549,16 @@ function MultiWidget({ response, locale, onChange, initial }: { response: Extrac
   useKeys(push, true)
   return (
     <div>
-      <div className="row">
-        {response.fields.map((item) => (
-          <button key={item.id} type="button" className="choice" data-on={active === item.id} onClick={() => setActive(item.id)}>
-            <small>{tx(locale, item.label)}</small>
-            <b>{(texts[item.id] ?? '').replace('.', decimalKey(locale)) || '—'}</b>
-          </button>
-        ))}
+      <div className="field-row">
+        {response.fields.map((item) => {
+          const shown = (texts[item.id] ?? '').replace('.', decimalKey(locale))
+          return (
+            <button key={item.id} type="button" className="field-card" data-on={active === item.id} data-long={longMark(shown.length)} onClick={() => setActive(item.id)}>
+              <small>{tx(locale, item.label)}</small>
+              <b>{shown || '—'}</b>
+            </button>
+          )
+        })}
       </div>
       {field ? <Pad locale={locale} allowDecimal={field.allowDecimal} allowNegative={field.allowNegative} onKey={push} /> : null}
     </div>

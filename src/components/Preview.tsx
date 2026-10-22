@@ -1,6 +1,9 @@
 import type { DomainId } from '../lib/types'
+import { skillPicture } from './SkillArt'
 
-export function SkillDemo({ domain }: { domain: DomainId }) {
+export function SkillDemo({ domain, skillId }: { domain: DomainId; skillId?: string }) {
+  const picture = skillId ? skillPicture(skillId) : null
+  if (picture) return <div className="demo art" aria-hidden="true">{picture}</div>
   if (domain === 'NF') {
     return (
       <div className="demo" aria-hidden="true">

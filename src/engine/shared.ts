@@ -51,6 +51,19 @@ export function knobBool(ctx: Ctx, id: string, fallback: boolean) {
   return typeof value === 'boolean' ? value : fallback
 }
 
+export function knobStr(ctx: Ctx, id: string, fallback: string) {
+  const value = ctx.knobs[id]
+  return typeof value === 'string' ? value : fallback
+}
+
+// Denominators a fraction question may use. The slider cap drops anything larger.
+export const DEN_POOL = [2, 3, 4, 5, 6, 8, 9, 10, 12, 15, 16, 18, 20, 24]
+
+export function densUpTo(cap: number) {
+  const pool = DEN_POOL.filter((d) => d <= cap)
+  return pool.length ? pool : [2]
+}
+
 export function familyOf(ctx: Ctx) {
   const value = ctx.knobs.family
   return typeof value === 'string' ? value : 'int'

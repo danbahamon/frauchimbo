@@ -9,8 +9,9 @@ export function levelKey(level: number) {
 }
 
 // The name for a set of settings: the level's name while untouched, otherwise "Custom".
-export function settingsKey(skill: Skill, level: number, values: KnobValues) {
+// `skip` leaves out choices that identify the card, such as which kind of problem it is.
+export function settingsKey(skill: Skill, level: number, values: KnobValues, skip: readonly string[] = []) {
   const base = defaultKnobs(skill, level)
-  const untouched = skill.knobs.every((knob) => values[knob.id] === base[knob.id])
+  const untouched = skill.knobs.every((knob) => skip.includes(knob.id) || values[knob.id] === base[knob.id])
   return untouched ? levelKey(level) : 'lvl.custom'
 }

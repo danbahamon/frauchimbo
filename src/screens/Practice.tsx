@@ -4,6 +4,7 @@ import { statsBySkill } from '../engine/insights'
 import type { DomainId, Grade } from '../lib/types'
 import { DOMAIN_ORDER } from '../lib/types'
 import { t, tx } from '../lib/i18n'
+import { skillMatches } from '../lib/search'
 import { useStore } from '../state'
 import { SkillDemo } from '../components/Preview'
 import { Icon } from '../components/Icon'
@@ -22,13 +23,13 @@ export function Practice() {
     if (!focusId) return
     document.getElementById(`skill-${focusId}`)?.scrollIntoView({ block: 'center' })
   }, [focusId, domain])
-  const needle = query.trim().toLowerCase()
+  const needle = query.trim()
   const inGrade = SKILLS.filter((skill) => !grade || skill.grade === grade)
   const strands = DOMAIN_ORDER.filter((item) => inGrade.some((skill) => skill.domain === item))
   const list = inGrade.filter((skill) => {
     if (!needle && domain && skill.domain !== domain) return false
     if (!needle) return Boolean(domain)
-    return `${skill.code} ${tx(locale, skill.title)} ${tx(locale, skill.blurb)}`.toLowerCase().includes(needle)
+    return skillMatches(skill, needle)
   })
   const showStrands = !needle && !domain
   return (
@@ -84,7 +85,7 @@ export function Practice() {
                   style={{ ['--wash' as string]: DOMAIN_COLOR[skill.domain], animationDelay: `${index * 35}ms` }}
                   onClick={() => setRoute({ name: 'play', skillId: skill.id })}
                 >
-                  <SkillDemo domain={skill.domain} />
+                  <SkillDemo domain={skill.domain} skillId={skill.id} />
                   <small>{skill.code}</small>
                   <b>{tx(locale, skill.title)}</b>
                   <span>{tx(locale, skill.blurb)}</span>
