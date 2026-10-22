@@ -58,6 +58,24 @@ export function knobsForPath(skill: Skill, difficulty: number, path: Record<stri
   return values
 }
 
+// Rebuild the squares that were stored on an attempt, such as "div|frac".
+// Hidden squares are skipped in the same order they were recorded.
+export function knobsFromVariant(skill: Skill, difficulty: number, variant?: string): KnobValues {
+  const values = defaultKnobs(skill, difficulty)
+  if (!variant) return values
+  const parts = variant.split('|')
+  let index = 0
+  for (const id of squareIds(skill)) {
+    const knob = skill.knobs.find((item) => item.id === id)
+    if (!knob) continue
+    if (knob.when && !knob.when.in.includes(String(values[knob.when.id] ?? ''))) continue
+    const part = parts[index]
+    index += 1
+    if (part) values[id] = part
+  }
+  return values
+}
+
 export function identityPath(skill: Skill, knobs: KnobValues): Record<string, string> {
   const path: Record<string, string> = {}
   for (const id of identityIds(skill, knobs)) {

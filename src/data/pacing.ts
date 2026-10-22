@@ -1,6 +1,9 @@
 import { L } from '../lib/math'
+import { identityPath, knobsForPath, unitKey } from '../lib/units'
 import { defaultKnobs, getSkill } from './skills'
-import type { Blueprint, Grade, KnobValues, Preset, PresetItem } from '../lib/types'
+import type { Blueprint, BlueprintItem, Grade, KnobValues, Preset, PresetItem } from '../lib/types'
+
+export const TEST_CAP = 36
 
 type Row = [string, number, number, KnobValues?]
 
@@ -241,6 +244,104 @@ export const PRESETS: Preset[] = [
 
 export function presetFor(grade: Grade, month: number) {
   return PRESETS.find((item) => item.grade === grade && item.month === month) ?? null
+}
+
+const HALF_MONTHS = [9, 11, 1]
+
+function takeEven<T>(items: T[], count: number): T[] {
+  if (items.length <= count) return items
+  const picked: T[] = []
+  const used = new Set<number>()
+  const step = items.length / count
+  for (let index = 0; index < count; index += 1) {
+    let at = Math.min(items.length - 1, Math.floor(index * step + step / 2))
+    while (used.has(at) && at < items.length - 1) at += 1
+    while (used.has(at) && at > 0) at -= 1
+    used.add(at)
+    const item = items[at]
+    if (item !== undefined) picked.push(item)
+  }
+  return picked
+}
+
+function allocate(weights: number[], target: number): number[] {
+  const size = weights.length
+  if (!size || target < 1) return weights.map(() => 0)
+  if (size >= target) return weights.map((_, index) => (index < target ? 1 : 0))
+  const sum = weights.reduce((total, weight) => total + weight, 0) || size
+  const raw = weights.map((weight) => (weight / sum) * target)
+  const counts = raw.map((value) => Math.floor(value))
+  let used = counts.reduce((total, count) => total + count, 0)
+  for (let index = 0; index < size; index += 1) {
+    if (counts[index] !== 0) continue
+    counts[index] = 1
+    used += 1
+  }
+  while (used > target) {
+    let donor = 0
+    for (let index = 1; index < size; index += 1) {
+      if ((counts[index] ?? 0) > (counts[donor] ?? 0)) donor = index
+    }
+    if ((counts[donor] ?? 0) <= 1) break
+    counts[donor] = (counts[donor] ?? 0) - 1
+    used -= 1
+  }
+  const order = raw
+    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+    .sort((left, right) => right.fraction - left.fraction)
+  let cursor = 0
+  while (used < target && order.length) {
+    const slot = order[cursor % order.length]
+    if (!slot) break
+    counts[slot.index] = (counts[slot.index] ?? 0) + 1
+    used += 1
+    cursor += 1
+  }
+  return counts
+}
+
+// A half-year check gathers September, November, and January.
+// A yearly check gathers every monthly checkpoint, still inside the test cap.
+export function standardsBlueprint(grade: Grade, span: 'half' | 'year'): Blueprint {
+  const months = span === 'half' ? HALF_MONTHS : CHECK_MONTHS
+  const merged = new Map<string, { item: BlueprintItem; weight: number; order: number }>()
+  let order = 0
+  for (const month of months) {
+    const preset = presetFor(grade, month)
+    if (!preset) continue
+    for (const item of materialize(preset).items) {
+      const skill = getSkill(item.skillId)
+      if (!skill) continue
+      const key = unitKey(item.skillId, item.knobs, skill)
+      const path = identityPath(skill, item.knobs)
+      const previous = merged.get(key)
+      const difficulty = Math.max(item.difficulty, previous?.item.difficulty ?? 0)
+      merged.set(key, {
+        item: {
+          skillId: item.skillId,
+          count: 1,
+          difficulty,
+          knobs: knobsForPath(skill, difficulty, path),
+        },
+        weight: (previous?.weight ?? 0) + item.count,
+        order: previous?.order ?? order++,
+      })
+    }
+  }
+  const rows = [...merged.values()].sort((left, right) => left.order - right.order)
+  const target = span === 'half' ? 24 : TEST_CAP
+  const kept = takeEven(rows, target)
+  const counts = allocate(kept.map((row) => row.weight), Math.min(target, TEST_CAP))
+  const year = L(`Grade ${grade} · The year`, `Klasse ${grade} · Das Jahr`, `Grado ${grade} · El año`)
+  const half = L(`Grade ${grade} · Half year`, `Klasse ${grade} · Halbjahr`, `Grado ${grade} · Medio año`)
+  return {
+    v: 1,
+    title: span === 'half' ? half : year,
+    presetId: `g${grade}${span}`,
+    items: kept
+      .map((row, index) => ({ ...row.item, count: counts[index] ?? 0 }))
+      .filter((item) => item.count > 0),
+  }
 }
 
 export function materialize(item: Preset): Blueprint {

@@ -1,9 +1,12 @@
 import { gradeAnswer, isCorrect } from '../src/lib/grade.ts'
-import { defaultKnobs, SKILLS } from '../src/data/skills.ts'
-import { PRESETS, materialize } from '../src/data/pacing.ts'
+import { defaultKnobs, SKILLS, getSkill } from '../src/data/skills.ts'
+import { PRESETS, materialize, standardsBlueprint } from '../src/data/pacing.ts'
+import { TOPICS, topicBlueprint } from '../src/data/topics.ts'
 import { generateQuestion } from '../src/engine/index.ts'
+import { mistakeBlueprint } from '../src/lib/mistakes.ts'
 import { fractionValue } from '../src/lib/math.ts'
-import type { Answer, KnobValues, Question, Response, Skill } from '../src/lib/types.ts'
+import { knobsForPath, knobsFromVariant, unitVariant } from '../src/lib/units.ts'
+import type { Answer, BlueprintItem, Grade, KnobValues, Question, Response, Skill } from '../src/lib/types.ts'
 
 function expectKind(response: Response, answer: Answer) {
   const map: Record<Response['type'], Answer['kind']> = {
@@ -119,30 +122,101 @@ for (const skill of SKILLS) {
   }
 }
 
+function assertKnobs(label: string, item: BlueprintItem) {
+  const skill = SKILLS.find((candidate) => candidate.id === item.skillId)
+  if (!skill) {
+    console.error('unknown skill', label, item.skillId)
+    failures += 1
+    return
+  }
+  for (const [key, value] of Object.entries(item.knobs)) {
+    const knob = skill.knobs.find((candidate) => candidate.id === key)
+    const valid =
+      knob !== undefined &&
+      (knob.kind === 'range'
+        ? typeof value === 'number' && value >= knob.min && value <= knob.max
+        : knob.kind === 'toggle'
+          ? typeof value === 'boolean'
+          : knob.options.some((option) => option.value === value))
+    if (!valid) {
+      console.error('bad knob', label, item.skillId, key, String(value))
+      failures += 1
+    }
+  }
+}
+
 for (const preset of PRESETS) {
   const blueprint = materialize(preset)
   if (!getKnown(blueprint.items.map((item) => item.skillId))) {
     console.error('bad preset', preset.id)
     failures += 1
   }
+  for (const item of blueprint.items) assertKnobs(preset.id, item)
+}
+
+const grades: Grade[] = [3, 4, 5, 6, 7]
+for (const grade of grades) {
+  for (const span of ['half', 'year'] as const) {
+    const blueprint = standardsBlueprint(grade, span)
+    const total = blueprint.items.reduce((sum, item) => sum + item.count, 0)
+    if (!blueprint.items.length || total > 36) {
+      console.error('bad span size', grade, span, total)
+      failures += 1
+    }
+    for (const item of blueprint.items) assertKnobs(`${grade}-${span}`, item)
+  }
+}
+
+for (const topic of TOPICS) {
+  const blueprint = topicBlueprint(topic)
+  const total = blueprint.items.reduce((sum, item) => sum + item.count, 0)
+  const gradesIn = new Set(blueprint.items.map((item) => getSkill(item.skillId)?.grade))
+  if (!blueprint.items.length || total > 36 || gradesIn.size < 2) {
+    console.error('bad topic', topic.id, total, [...gradesIn].join(','))
+    failures += 1
+  }
   for (const item of blueprint.items) {
-    const skill = SKILLS.find((candidate) => candidate.id === item.skillId)
+    assertKnobs(topic.id, item)
+    const skill = getSkill(item.skillId)
     if (!skill) continue
-    for (const [key, value] of Object.entries(item.knobs)) {
-      const knob = skill.knobs.find((candidate) => candidate.id === key)
-      const valid =
-        knob !== undefined &&
-        (knob.kind === 'range'
-          ? typeof value === 'number' && value >= knob.min && value <= knob.max
-          : knob.kind === 'toggle'
-            ? typeof value === 'boolean'
-            : knob.options.some((option) => option.value === value))
-      if (!valid) {
-        console.error('bad preset knob', preset.id, item.skillId, key, String(value))
-        failures += 1
-      }
+    try {
+      structural(generateQuestion(skill, item.difficulty, item.knobs))
+    } catch (error) {
+      failures += 1
+      console.error(topic.id, item.skillId, error instanceof Error ? error.message : error)
     }
   }
+}
+
+const signed = getSkill('7.ns.a')
+const fractions = getSkill('3.nf.a')
+if (signed && fractions) {
+  const knobs = knobsForPath(signed, 4, { mode: 'div', family: 'frac' })
+  const back = knobsFromVariant(signed, 4, unitVariant(signed, knobs))
+  if (back.mode !== 'div' || back.family !== 'frac') {
+    console.error('variant roundtrip', back.mode, back.family)
+    failures += 1
+  }
+  const plain = knobsForPath(fractions, 3, { mode: 'compare' })
+  if (knobsFromVariant(fractions, 3, unitVariant(fractions, plain)).mode !== 'compare') {
+    console.error('variant mode')
+    failures += 1
+  }
+}
+
+const progress = mistakeBlueprint(
+  [
+    { id: '1', skillId: '3.nf.a', correct: false, timeMs: 1, difficulty: 3, at: 1, mode: 'practice', variant: 'compare' },
+    { id: '2', skillId: '3.nf.a', correct: true, timeMs: 1, difficulty: 3, at: 2, mode: 'practice', variant: 'shade' },
+    { id: '4.nf.b', skillId: '4.nf.b', correct: false, timeMs: 1, difficulty: 4, at: 3, mode: 'test', variant: 'add' },
+    { id: '3', skillId: '3.nf.a', correct: false, timeMs: 1, difficulty: 3, at: 4, mode: 'practice', variant: 'compare' },
+  ],
+  10,
+)
+const progressModes = progress?.items.map((item) => `${item.skillId}:${String(item.knobs.mode)}x${item.count}`).join(',')
+if (progressModes !== '3.nf.a:comparex2,4.nf.b:addx1') {
+  console.error('mistake blueprint', progressModes)
+  failures += 1
 }
 
 function getKnown(ids: string[]) {

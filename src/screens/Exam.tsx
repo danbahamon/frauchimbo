@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DOMAIN_COLOR, SKILLS, getSkill } from '../data/skills'
-import { CHECK_MONTHS, materialize, presetFor } from '../data/pacing'
+import { CHECK_MONTHS, materialize, presetFor, standardsBlueprint, TEST_CAP } from '../data/pacing'
+import { TOPICS, topicBlueprint, topicById } from '../data/topics'
+import { mistakeBlueprint } from '../lib/mistakes'
 import { generateTest } from '../engine'
 import { gradeAnswer, isCorrect } from '../lib/grade'
 import { levelKey, settingsKey } from '../lib/levels'
@@ -22,7 +24,7 @@ import { Icon } from '../components/Icon'
 import { UnitSquares } from '../components/UnitSquares'
 
 const GRADES: Grade[] = [3, 4, 5, 6, 7]
-const CAP = 36
+const CAP = TEST_CAP
 
 function kindLabel(skill: Skill, knobs: KnobValues, locale: Locale) {
   const title = unitTitle(skill, knobs)
@@ -73,7 +75,10 @@ function Builder() {
   const [title, setTitle] = useState('')
   const [tray, setTray] = useState<BlueprintItem[]>([])
   const [openIndex, setOpenIndex] = useState<number | null>(null)
-  const [panel, setPanel] = useState<'choose' | 'month' | 'compose'>('choose')
+  const [panel, setPanel] = useState<'choose' | 'month' | 'compose' | 'topic' | 'progress'>('choose')
+  const [span, setSpan] = useState<'month' | 'half' | 'year'>('month')
+  const [topicId, setTopicId] = useState<string | null>(null)
+  const [mistakeCount, setMistakeCount] = useState(10)
   const [strand, setStrand] = useState<DomainId | null>(null)
   const [everyGrade, setEveryGrade] = useState(false)
   const [query, setQuery] = useState('')
@@ -83,7 +88,7 @@ function Builder() {
   const total = tray.reduce((sum, item) => sum + item.count, 0)
   useEffect(() => {
     if (openIndex === null) return
-    document.querySelector(`[data-open='true']`)?.scrollIntoView({ block: 'nearest' })
+    document.querySelector('.tray-more')?.scrollIntoView({ block: 'nearest' })
   }, [openIndex])
   const monthNow = monthIndex()
   const school = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6]
@@ -136,7 +141,6 @@ function Builder() {
     const used = tray.reduce((sum, item) => sum + item.count, 0)
     if (used >= CAP) return
     setTray([...tray, { skillId, count: 2, difficulty, knobs: knobsForPath(skill, difficulty, nextPath) }])
-    setOpenIndex(tray.length)
   }
 
   const openCategory = (skillId: string) => {
@@ -186,6 +190,11 @@ function Builder() {
   }
 
   const preset = month ? presetFor(grade, month) : undefined
+  const openTray = (next: Blueprint) => {
+    setTray(next.items)
+    setTitle(tx(locale, next.title) ?? '')
+    setPanel('compose')
+  }
   const gradeRow = (
     <div className="segment">
       {GRADES.map((item) => (
@@ -201,10 +210,20 @@ function Builder() {
         <h1>{t(locale, 'test.choose')}</h1>
         <p className="muted">{t(locale, 'test.hero.sub')}</p>
         <div className="catalog">
-          <button type="button" className="strand-card" style={{ ['--wash' as string]: '#0f766e' }} onClick={() => { setMonthAt(Math.max(0, months.indexOf(reached))); setPanel('month') }}>
+          <button type="button" className="strand-card" style={{ ['--wash' as string]: '#0f766e' }} onClick={() => { setMonthAt(Math.max(0, months.indexOf(reached))); setSpan('month'); setPanel('month') }}>
             <SkillDemo domain="MD" />
             <b>{t(locale, 'test.mode.month')}</b>
             <small>{t(locale, 'test.mode.month.sub')}</small>
+          </button>
+          <button type="button" className="strand-card" style={{ ['--wash' as string]: '#7c4a7a' }} onClick={() => { setTopicId(null); setPanel('topic') }}>
+            <SkillDemo domain="NF" />
+            <b>{t(locale, 'test.mode.topic')}</b>
+            <small>{t(locale, 'test.mode.topic.sub')}</small>
+          </button>
+          <button type="button" className="strand-card" style={{ ['--wash' as string]: '#c4841d' }} onClick={() => setPanel('progress')}>
+            <SkillDemo domain="SP" />
+            <b>{t(locale, 'test.mode.progress')}</b>
+            <small>{t(locale, 'test.mode.progress.sub')}</small>
           </button>
           <button type="button" className="strand-card" style={{ ['--wash' as string]: '#e25b45' }} onClick={() => setPanel('compose')}>
             <SkillDemo domain="OA" />
@@ -216,23 +235,161 @@ function Builder() {
     )
   }
 
-  if (panel === 'month' && preset && month) {
+  const spanChoices = (
+    <div className="segment wrap" style={{ marginTop: 12 }}>
+      {(['month', 'half', 'year'] as const).map((item) => (
+        <button key={item} type="button" data-on={span === item} onClick={() => setSpan(item)}>{t(locale, `test.span.${item}`)}</button>
+      ))}
+    </div>
+  )
+
+  if (panel === 'month') {
+    const wide = span === 'month' ? null : standardsBlueprint(grade, span)
+    const wideCount = wide ? wide.items.reduce((sum, item) => sum + item.count, 0) : 0
     return (
       <div className="swap">
         <button type="button" className="text-btn" onClick={() => setPanel('choose')}><Icon name="back" /> {t(locale, 'on.back')}</button>
-        <p className="kicker">{month === reached ? t(locale, 'test.thisMonth') : t(locale, 'nav.test')}</p>
-        <h1>{tx(locale, preset.title)}</h1>
+        <p className="kicker">{span === 'month' && month === reached ? t(locale, 'test.thisMonth') : t(locale, 'nav.test')}</p>
+        <h1>{wide ? tx(locale, wide.title) : preset ? tx(locale, preset.title) : t(locale, 'nav.test')}</h1>
         {gradeRow}
-        <article className="month-stage" data-now={month === reached}>
-          <div className="month-nav">
-            <button type="button" className="icon-btn" aria-label={t(locale, 'on.back')} disabled={monthAt <= 0} onClick={() => setMonthAt((value) => Math.max(0, value - 1))}><Icon name="back" /></button>
-            <b>{monthName(locale, month)}</b>
-            <button type="button" className="icon-btn" aria-label={t(locale, 'play.next')} disabled={monthAt >= months.length - 1} onClick={() => setMonthAt((value) => Math.min(months.length - 1, value + 1))}><span className="flip"><Icon name="back" /></span></button>
+        {spanChoices}
+        {wide ? (
+          <article className="month-stage">
+            <p className="muted">{t(locale, span === 'half' ? 'test.half.note' : 'test.year.note')}</p>
+            <p className="fine">{t(locale, 'test.tray', { n: wideCount })}</p>
+            <button type="button" className="primary" onClick={() => go(wide)}>{t(locale, 'test.startCheck')}</button>
+            <button type="button" className="text-btn" onClick={() => openTray(wide)}>{t(locale, 'test.customize')}</button>
+          </article>
+        ) : preset && month ? (
+          <article className="month-stage" data-now={month === reached}>
+            <div className="month-nav">
+              <button type="button" className="icon-btn" aria-label={t(locale, 'on.back')} disabled={monthAt <= 0} onClick={() => setMonthAt((value) => Math.max(0, value - 1))}><Icon name="back" /></button>
+              <b>{monthName(locale, month)}</b>
+              <button type="button" className="icon-btn" aria-label={t(locale, 'play.next')} disabled={monthAt >= months.length - 1} onClick={() => setMonthAt((value) => Math.min(months.length - 1, value + 1))}><span className="flip"><Icon name="back" /></span></button>
+            </div>
+            <p className="muted">{tx(locale, preset.note)}</p>
+            <button type="button" className="primary" onClick={() => go(materialize(preset))}>{t(locale, 'test.startCheck')}</button>
+            <button type="button" className="text-btn" onClick={() => openTray(materialize(preset))}>{t(locale, 'test.customize')}</button>
+          </article>
+        ) : null}
+      </div>
+    )
+  }
+
+  if (panel === 'topic') {
+    const topic = topicId ? topicById(topicId) : null
+    if (!topic) {
+      return (
+        <div className="swap">
+          <button type="button" className="text-btn" onClick={() => setPanel('choose')}><Icon name="back" /> {t(locale, 'on.back')}</button>
+          <p className="kicker">{t(locale, 'nav.test')}</p>
+          <h1>{t(locale, 'test.topic.pick')}</h1>
+          <p className="muted">{t(locale, 'test.mode.topic.sub')}</p>
+          <div className="catalog">
+            {TOPICS.map((item, index) => {
+              const preview = topicBlueprint(item)
+              const grades = preview.items.map((row) => getSkill(row.skillId)?.grade).filter((value): value is Grade => value != null)
+              const count = preview.items.reduce((sum, row) => sum + row.count, 0)
+              const low = grades.length ? Math.min(...grades) : 3
+              const high = grades.length ? Math.max(...grades) : 7
+              return (
+                <button key={item.id} type="button" className="strand-card" style={{ ['--wash' as string]: DOMAIN_COLOR[item.domain], animationDelay: `${index * 40}ms` }} onClick={() => setTopicId(item.id)}>
+                  <SkillDemo domain={item.domain} />
+                  <b>{tx(locale, item.title)}</b>
+                  <small>{t(locale, 'test.topic.span', { a: low, b: high, n: count })}</small>
+                </button>
+              )
+            })}
           </div>
-          <p className="muted">{tx(locale, preset.note)}</p>
-          <button type="button" className="primary" onClick={() => go(materialize(preset))}>{t(locale, 'test.startCheck')}</button>
-          <button type="button" className="text-btn" onClick={() => { setTray(materialize(preset).items); setTitle(tx(locale, preset.title)); setPanel('compose') }}>{t(locale, 'test.customize')}</button>
-        </article>
+        </div>
+      )
+    }
+    const blueprint = topicBlueprint(topic)
+    const covered: { id: string; grade: number; title: string }[] = []
+    for (const item of blueprint.items) {
+      if (covered.some((row) => row.id === item.skillId)) continue
+      const skill = getSkill(item.skillId)
+      if (!skill) continue
+      covered.push({ id: skill.id, grade: skill.grade, title: tx(locale, skill.title) })
+    }
+    const grades = covered.map((row) => row.grade)
+    const low = grades.length ? Math.min(...grades) : grade
+    const high = grades.length ? Math.max(...grades) : grade
+    const count = blueprint.items.reduce((sum, item) => sum + item.count, 0)
+    return (
+      <div className="swap">
+        <button type="button" className="text-btn" onClick={() => setTopicId(null)}><Icon name="back" /> {t(locale, 'on.back')}</button>
+        <p className="kicker">{t(locale, 'test.mode.topic')}</p>
+        <h1>{tx(locale, topic.title)}</h1>
+        <p className="muted">{tx(locale, topic.note)}</p>
+        <p className="fine">{t(locale, 'test.topic.span', { a: low, b: high, n: count })}</p>
+        <div className="list">
+          {covered.map((row) => (
+            <p key={row.id} className="fine">{t(locale, 'grade.n', { n: row.grade })} · {row.title}</p>
+          ))}
+        </div>
+        <div className="row" style={{ marginTop: 14 }}>
+          <button type="button" className="primary" onClick={() => go(blueprint)}>{t(locale, 'test.startCheck')}</button>
+          <button type="button" className="text-btn" onClick={() => openTray(blueprint)}>{t(locale, 'test.customize')}</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (panel === 'progress') {
+    const recorded = data.attempts.filter((item) => !item.correct).length
+    const chosen = Math.min(mistakeCount, recorded, CAP)
+    const blueprint = chosen > 0 ? mistakeBlueprint(data.attempts, chosen) : null
+    const rows = blueprint?.items ?? []
+    const shown = rows.slice(0, 8)
+    return (
+      <div className="swap">
+        <button type="button" className="text-btn" onClick={() => setPanel('choose')}><Icon name="back" /> {t(locale, 'on.back')}</button>
+        <p className="kicker">{t(locale, 'test.mode.progress')}</p>
+        <h1>{t(locale, 'test.progress.pick')}</h1>
+        <p className="muted">{t(locale, 'test.mode.progress.sub')}</p>
+        {recorded ? (
+          <>
+            <p className="fine">{t(locale, 'test.progress.have', { n: recorded })}</p>
+            <div className="segment wrap" style={{ marginTop: 12 }}>
+              {[5, 10, 15, 20, 30].filter((item) => item <= recorded).map((item) => (
+                <button key={item} type="button" data-on={chosen === item} onClick={() => setMistakeCount(item)}>{item}</button>
+              ))}
+            </div>
+            <p className="fine" style={{ marginTop: 12 }}>
+              <span className="stepper">
+                <button type="button" disabled={chosen <= 1} onClick={() => setMistakeCount(Math.max(1, chosen - 1))}>−</button>
+                {chosen}
+                <button type="button" disabled={chosen >= Math.min(recorded, CAP)} onClick={() => setMistakeCount(Math.min(CAP, chosen + 1))}>+</button>
+              </span>
+            </p>
+            <p className="muted">{t(locale, 'test.progress.using', { n: chosen })}</p>
+            <div className="list">
+              {shown.map((item, index) => {
+                const skill = getSkill(item.skillId)
+                const kind = skill ? kindLabel(skill, item.knobs, locale) : ''
+                return (
+                  <p key={`${item.skillId}-${index}`} className="fine">
+                    <b>{kind || (skill ? tx(locale, skill.title) : item.skillId)}</b>
+                    {kind && skill ? ` · ${tx(locale, skill.title)}` : ''} · {t(locale, 'test.tray', { n: item.count })}
+                  </p>
+                )
+              })}
+              {rows.length > shown.length ? <p className="fine">{t(locale, 'test.progress.more', { n: rows.length - shown.length })}</p> : null}
+            </div>
+            {blueprint ? (
+              <div className="row" style={{ marginTop: 14 }}>
+                <button type="button" className="primary" onClick={() => go(blueprint)}>{t(locale, 'test.startCheck')}</button>
+                <button type="button" className="text-btn" onClick={() => openTray(blueprint)}>{t(locale, 'test.customize')}</button>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <article className="month-stage">
+            <Mascot mood="think" size={72} />
+            <p>{t(locale, 'test.progress.none')}</p>
+          </article>
+        )}
       </div>
     )
   }
@@ -289,8 +446,10 @@ function Builder() {
             const skill = getSkill(item.skillId)
             if (!skill) return null
             const kind = kindLabel(skill, item.knobs, locale)
+            const pinned = (data.pins ?? []).some((pin) => unitKey(pin.skillId, pin.knobs, skill) === unitKey(item.skillId, item.knobs, skill))
+            const open = openIndex === index
             return (
-              <article key={`${item.skillId}-${String(item.knobs.mode ?? '')}-${index}`} className="tray-row" data-open={openIndex === index}>
+              <article key={`${item.skillId}-${String(item.knobs.mode ?? '')}-${index}`} className="tray-row" data-open={open}>
                 <div className="tray-order">
                   <button type="button" className="tray-mini icon" disabled={index === 0} aria-label={t(locale, 'test.up')} onClick={() => move(index, -1)}>↑</button>
                   <button type="button" className="tray-mini icon" disabled={index === tray.length - 1} aria-label={t(locale, 'test.down')} onClick={() => move(index, 1)}>↓</button>
@@ -301,19 +460,27 @@ function Builder() {
                   <b>{kind || tx(locale, skill.title)}</b>
                   <small>{skill.code}{kind ? ` · ${tx(locale, skill.title)}` : ''} · {item.difficulty} {t(locale, settingsKey(skill, item.difficulty, item.knobs, squareIds(skill)))}{everyGrade || skill.grade !== grade ? ` · ${t(locale, 'grade.n', { n: skill.grade })}` : ''}</small>
                 </div>
-                <div className="tray-actions">
+                <div className="tray-count">
+                  <span className="fine">{t(locale, 'tray.questions')}</span>
                   <span className="stepper">
-                    <button type="button" onClick={() => setTray((current) => current.map((row, itemIndex) => itemIndex === index ? { ...row, count: Math.max(1, row.count - 1) } : row))}>−</button>
-                    {item.count}
-                    <button type="button" onClick={() => setTray((current) => current.map((row, itemIndex) => itemIndex === index && total < CAP ? { ...row, count: row.count + 1 } : row))}>+</button>
+                    <button type="button" aria-label={t(locale, 'tray.fewer')} onClick={() => setTray((current) => current.map((row, itemIndex) => itemIndex === index ? { ...row, count: Math.max(1, row.count - 1) } : row))}>−</button>
+                    <b>{item.count}</b>
+                    <button type="button" aria-label={t(locale, 'tray.moreQuestions')} onClick={() => setTray((current) => current.map((row, itemIndex) => itemIndex === index && total < CAP ? { ...row, count: row.count + 1 } : row))}>+</button>
                   </span>
-                  <button type="button" className="tray-mini icon" aria-pressed={openIndex === index} aria-label={t(locale, 'test.difficulty')} title={t(locale, 'test.difficulty')} onClick={() => setOpenIndex(openIndex === index ? null : index)}><Icon name="gear" size={16} /></button>
-                  <button type="button" className="tray-mini" onClick={() => togglePin(item)}>{t(locale, (data.pins ?? []).some((pin) => unitKey(pin.skillId, pin.knobs, skill) === unitKey(item.skillId, item.knobs, skill)) ? 'work.unpin' : 'work.pin')}</button>
-                  <button type="button" className="tray-mini danger" onClick={() => removeAt(index)}>{t(locale, 'test.remove')}</button>
+                </div>
+                <div className="tray-tools">
+                  <button type="button" className="tray-tool" aria-expanded={open} onClick={() => setOpenIndex(open ? null : index)}>
+                    <Icon name="gear" size={16} /> {t(locale, open ? 'tray.done' : 'tray.adjust')}
+                  </button>
+                  <button type="button" className="tray-tool" aria-pressed={pinned} onClick={() => togglePin(item)}>
+                    <Icon name="pin" size={16} /> {t(locale, pinned ? 'work.unpin' : 'work.pin')}
+                  </button>
+                  <button type="button" className="tray-tool danger" onClick={() => removeAt(index)}>{t(locale, 'test.remove')}</button>
                 </div>
                 </div>
-                {openIndex === index ? (
+                {open ? (
                   <div className="tray-more">
+                    <p className="fine">{t(locale, 'tray.note')}</p>
                     <div className="variable">
                       <div className="variable-head"><span>{t(locale, 'test.difficulty')}</span></div>
                       <div className="segment wrap" role="radiogroup" aria-label={t(locale, 'test.difficulty')}>

@@ -68,6 +68,10 @@ export function Provider({ children }: { children: ReactNode }) {
     document.documentElement.lang = data.profile?.locale ?? 'en'
     document.documentElement.dataset.theme = data.profile?.theme ?? 'day'
     document.documentElement.dataset.motion = data.profile?.motion === false ? 'off' : 'on'
+    const color = data.profile?.theme === 'dusk' ? '#14110e' : '#f3eadf'
+    document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((theme) => {
+      theme.content = color
+    })
   }, [data.profile])
 
   const api = useMemo<Store>(() => {

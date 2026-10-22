@@ -26,9 +26,9 @@ function Nav({ tab, locale, onPick }: { tab: string; locale: Locale; onPick: (na
   return (
     <>
       {NAV.map(([name, key, icon]) => (
-        <button key={name} type="button" className="nav-btn" data-on={tab === name} onClick={() => onPick(name)}>
+        <button key={name} type="button" className="nav-btn" data-on={tab === name} aria-current={tab === name ? 'page' : undefined} onClick={() => onPick(name)}>
           <Icon name={icon} />
-          {t(locale, key)}
+          <span>{t(locale, key)}</span>
         </button>
       ))}
     </>
@@ -95,9 +95,11 @@ export function Shell() {
         {settingsOpen ? (
           <div className="modal-back">
             <div className="modal settings-panel">
-              <button type="button" className="ghost" onClick={() => setSettingsOpen(false)}>
+            <div className="settings-top">
+              <button type="button" className="settings-back" onClick={() => setSettingsOpen(false)}>
                 <Icon name="back" /> {t(locale, 'set.back')}
               </button>
+            </div>
               <Settings />
             </div>
           </div>

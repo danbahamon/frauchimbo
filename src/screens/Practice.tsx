@@ -32,7 +32,7 @@ export function Practice() {
   const total = tray.reduce((sum, item) => sum + item.count, 0)
   useEffect(() => {
     if (openIndex === null) return
-    document.querySelector(`[data-open='true']`)?.scrollIntoView({ block: 'nearest' })
+    document.querySelector('.tray-more')?.scrollIntoView({ block: 'nearest' })
   }, [openIndex])
   const needle = query.trim()
   const inGrade = SKILLS.filter((item) => !grade || item.grade === grade)
@@ -50,7 +50,6 @@ export function Practice() {
     if (!chosen) return
     const knobs = knobsForPath(chosen, difficultyFor, nextPath)
     setTray((current) => [...current, { skillId: id, count: 4, difficulty: difficultyFor, knobs }])
-    setOpenIndex(tray.length)
   }
 
   const chooseSquare = (id: string, value: string) => {
@@ -102,6 +101,7 @@ export function Practice() {
   }
 
   const crumb = skill ? unitTitle(skill, path) : null
+  const start = () => setRoute({ name: 'play', queue: tray.flatMap((item) => Array.from({ length: item.count }, () => ({ ...item, count: 1 }))) })
   return (
     <div>
       <p className="kicker">{t(locale, 'nav.practice')}</p>
@@ -121,33 +121,49 @@ export function Practice() {
         </div>
       ) : null}
       {tray.length ? (
-        <div className="tray" style={{ marginTop: 14 }}>
+        <div className="practice-go">
+          <button type="button" className="primary wide" onClick={start}>
+            <Icon name="forward" /> {t(locale, 'practice.start', { n: total })}
+          </button>
+        </div>
+      ) : null}
+      {tray.length ? (
+        <div className="tray">
           {tray.map((item, index) => {
             const rowSkill = getSkill(item.skillId)
             if (!rowSkill) return null
             const title = unitTitle(rowSkill, item.knobs)
             const pinned = (data.pins ?? []).some((pin) => unitKey(pin.skillId, pin.knobs, rowSkill) === unitKey(item.skillId, item.knobs, rowSkill))
+            const open = openIndex === index
             return (
-              <article key={`${item.skillId}-${index}`} className="tray-row" data-open={openIndex === index}>
+              <article key={`${item.skillId}-${index}`} className="tray-row" data-open={open}>
                 <i style={{ background: DOMAIN_COLOR[rowSkill.domain] }} />
                 <div className="tray-body">
-                <div className="tray-copy">
-                  <b>{title ? tx(locale, title) : tx(locale, rowSkill.title)}</b>
-                  <small>{rowSkill.code} · {item.difficulty} {t(locale, settingsKey(rowSkill, item.difficulty, item.knobs, squareIds(rowSkill)))}</small>
+                  <div className="tray-copy">
+                    <b>{title ? tx(locale, title) : tx(locale, rowSkill.title)}</b>
+                    <small>{rowSkill.code} · {item.difficulty} {t(locale, settingsKey(rowSkill, item.difficulty, item.knobs, squareIds(rowSkill)))}</small>
+                  </div>
+                  <div className="tray-count">
+                    <span className="fine">{t(locale, 'tray.questions')}</span>
+                    <span className="stepper">
+                      <button type="button" aria-label={t(locale, 'tray.fewer')} onClick={() => setTray((current) => current.map((row, itemIndex) => itemIndex === index ? { ...row, count: Math.max(1, row.count - 1) } : row))}>−</button>
+                      <b>{item.count}</b>
+                      <button type="button" aria-label={t(locale, 'tray.moreQuestions')} onClick={() => setTray((current) => current.map((row, itemIndex) => itemIndex === index ? { ...row, count: row.count + 1 } : row))}>+</button>
+                    </span>
+                  </div>
+                  <div className="tray-tools">
+                    <button type="button" className="tray-tool" aria-expanded={open} onClick={() => setOpenIndex(open ? null : index)}>
+                      <Icon name="gear" size={16} /> {t(locale, open ? 'tray.done' : 'tray.adjust')}
+                    </button>
+                    <button type="button" className="tray-tool" aria-pressed={pinned} onClick={() => togglePin(item)}>
+                      <Icon name="pin" size={16} /> {t(locale, pinned ? 'work.unpin' : 'work.pin')}
+                    </button>
+                    <button type="button" className="tray-tool danger" onClick={() => { setTray((current) => current.filter((_, itemIndex) => itemIndex !== index)); setOpenIndex((current) => (current === index ? null : current !== null && current > index ? current - 1 : current)) }}>{t(locale, 'test.remove')}</button>
+                  </div>
                 </div>
-                <div className="tray-actions">
-                  <span className="stepper">
-                    <button type="button" onClick={() => setTray((current) => current.map((row, itemIndex) => itemIndex === index ? { ...row, count: Math.max(1, row.count - 1) } : row))}>−</button>
-                    {item.count}
-                    <button type="button" onClick={() => setTray((current) => current.map((row, itemIndex) => itemIndex === index ? { ...row, count: row.count + 1 } : row))}>+</button>
-                  </span>
-                  <button type="button" className="tray-mini icon" aria-pressed={openIndex === index} aria-label={t(locale, 'test.difficulty')} onClick={() => setOpenIndex(openIndex === index ? null : index)}><Icon name="gear" size={16} /></button>
-                  <button type="button" className="tray-mini" onClick={() => togglePin(item)}>{t(locale, pinned ? 'work.unpin' : 'work.pin')}</button>
-                  <button type="button" className="tray-mini danger" onClick={() => { setTray((current) => current.filter((_, itemIndex) => itemIndex !== index)); setOpenIndex((open) => (open === index ? null : open !== null && open > index ? open - 1 : open)) }}>{t(locale, 'test.remove')}</button>
-                </div>
-                </div>
-                {openIndex === index ? (
+                {open ? (
                   <div className="tray-more">
+                    <p className="fine">{t(locale, 'tray.note')}</p>
                     <div className="variable">
                       <div className="variable-head"><span>{t(locale, 'test.difficulty')}</span></div>
                       <div className="segment wrap" role="radiogroup" aria-label={t(locale, 'test.difficulty')}>
@@ -164,9 +180,6 @@ export function Practice() {
               </article>
             )
           })}
-          <button type="button" className="primary" onClick={() => setRoute({ name: 'play', queue: tray.flatMap((item) => Array.from({ length: item.count }, () => ({ ...item, count: 1 }))) })}>
-            <Icon name="forward" /> {t(locale, 'practice.start', { n: total })}
-          </button>
         </div>
       ) : null}
       {skill && layer ? (
