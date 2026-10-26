@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Practice review · Frau Chimbo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,680&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --ink: #1c1712;
+        --soft: #5c5348;
+        --cream: #f4ecdf;
+        --paper: #fffaf3;
+        --line: rgba(28, 23, 18, 0.12);
+        --coral: #e25b45;
+        --teal: #0f766e;
+        --teal-soft: #d7f3ef;
+        --gold: #e0a100;
+        --gold-soft: #fff1c4;
+        --shadow: 0 18px 50px rgba(70, 42, 18, 0.12);
+        --serif: "Fraunces", Palatino, serif;
+        --sans: "Outfit", "Segoe UI", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; }
+      body {
+        color: var(--ink);
+        background:
+          radial-gradient(900px 480px at -10% -10%, rgba(226, 91, 69, 0.16), transparent 55%),
+          radial-gradient(800px 520px at 110% 0%, rgba(15, 118, 110, 0.14), transparent 50%),
+          var(--cream);
+        font-family: var(--sans);
+        font-size: 16px;
+        line-height: 1.5;
+      }
+      button, input { font: inherit; color: inherit; }
+      button { cursor: pointer; }
+      button:focus-visible, input:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+      .wrap { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
+      header.top { padding: 28px 0 8px; }
+      .brand { margin: 0; font-family: var(--serif); font-size: 15px; letter-spacing: 0.01em; }
+      .brand em { font-style: normal; color: var(--coral); }
+      h1 { font-family: var(--serif); font-weight: 680; font-size: clamp(40px, 6vw, 64px); line-height: 0.95; margin: 8px 0 10px; }
+      .lede { max-width: 68ch; color: var(--soft); margin: 0 0 8px; }
+      h2 { font-family: var(--serif); font-weight: 680; font-size: 32px; margin: 0 0 12px; }
+      h3 { font-family: var(--serif); font-size: 26px; margin: 0; }
+      .section { margin: 28px 0 40px; }
+      .collage { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+      .tile {
+        display: flex; flex-direction: column; text-align: left; padding: 0; border: 1px solid var(--line);
+        background: var(--paper); border-radius: 22px; overflow: hidden; box-shadow: var(--shadow);
+      }
+      .tile.grade { grid-column: span 2; }
+      .tile.control { grid-column: span 3; }
+      .tile:hover { transform: translateY(-2px); }
+      .frame { display: block; height: 280px; background: #efe6d8; overflow: hidden; }
+      .tile.control .frame { height: 210px; }
+      .frame img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+      .tile-copy { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 12px 14px 14px; }
+      .tile-copy strong { font-size: 16px; }
+      .tile-copy small { color: var(--soft); }
+      .notes { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; }
+      .card, .practice, .skill, .suggest { background: var(--paper); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); }
+      .card { padding: 18px 18px 8px; }
+      .card p, .essay p { margin: 0 0 12px; }
+      .card h2 { font-size: 28px; }
+      table { width: 100%; border-collapse: collapse; font-size: 15px; }
+      th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-top: 1px solid var(--line); }
+      th { color: var(--soft); font-weight: 600; font-size: 13px; }
+      .suggest { padding: 8px 8px 12px; overflow-x: auto; }
+      .stage { min-height: 100dvh; }
+      .strip-bar {
+        position: sticky; top: 0; z-index: 2; display: flex; gap: 10px; align-items: center;
+        padding: 10px 16px; background: rgba(244, 236, 223, 0.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+      }
+      .back, .jump {
+        border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 8px 14px; white-space: nowrap;
+      }
+      .back { font-weight: 600; }
+      .strip { display: flex; gap: 8px; overflow-x: auto; flex: 1; padding-bottom: 2px; }
+      .thumb { width: 86px; height: 58px; padding: 0; border-radius: 12px; overflow: hidden; border: 2px solid transparent; background: #efe6d8; flex: none; }
+      .thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+      .thumb[aria-current="true"] { border-color: var(--teal); }
+      .detail { display: grid; grid-template-columns: minmax(280px, 42%) 1fr; height: calc(100dvh - 79px); }
+      .pane { overflow: auto; }
+      .shot-pane { background: #efe6d8; }
+      .shot-pane img { width: 100%; height: auto; display: block; }
+      .text-pane { padding: 22px 22px 64px; }
+      .kicker { color: var(--teal); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-size: 12px; margin: 0 0 4px; }
+      .toolbar { display: flex; gap: 10px; align-items: center; margin: 14px 0; flex-wrap: wrap; }
+      .toolbar input { flex: 1; min-width: 180px; border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 10px 14px; }
+      .skills { display: flex; gap: 6px; flex-wrap: wrap; }
+      .jump[aria-current="true"] { background: var(--teal); color: white; border-color: var(--teal); }
+      .legend { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
+      .legend span, .badge { border-radius: 999px; padding: 3px 8px; font-size: 12px; font-weight: 700; }
+      .uses { background: var(--teal-soft); color: var(--teal); }
+      .scale { background: var(--gold-soft); color: #8a6400; }
+      .unread { background: #fde2dc; color: #9f2d22; }
+      .skill { padding: 16px; margin: 0 0 16px; scroll-margin-top: 96px; }
+      .skill header p { color: var(--soft); margin: 4px 0 12px; }
+      .practice { padding: 14px; margin: 0 0 12px; }
+      .practice h4 { margin: 0; font-size: 18px; }
+      .sample { margin: 8px 0; padding: 10px 12px; background: #fff6e8; border-radius: 14px; }
+      .meta { display: flex; gap: 14px; flex-wrap: wrap; color: var(--soft); font-size: 14px; margin: 0 0 10px; }
+      .meta b { color: var(--ink); font-weight: 600; }
+      .var { display: grid; grid-template-columns: 92px 1fr; gap: 8px 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+      .usual { font-family: var(--serif); font-size: 28px; line-height: 1; }
+      .usual small { display: block; font-family: var(--sans); font-size: 11px; color: var(--soft); font-weight: 600; margin-top: 4px; }
+      .var-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .var-top strong { font-size: 15px; }
+      code { font-size: 12px; background: #f3eee6; border-radius: 6px; padding: 1px 5px; }
+      .hint, .when { margin: 4px 0 0; color: var(--soft); font-size: 14px; }
+      .levels { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+      .levels i { font-style: normal; min-width: 1.4rem; text-align: center; background: #f3eee6; border-radius: 999px; padding: 2px 6px; font-size: 12px; }
+      .levels i.on { background: var(--ink); color: white; }
+      .pills { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+      .pills i { font-style: normal; background: #f3eee6; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+      .control-block { margin: 0 0 18px; }
+      .control-block h3 { margin-bottom: 8px; }
+      .feel { margin: 4px 0 0; }
+      .did { color: var(--soft); font-size: 14px; margin: 0; }
+      .empty { color: var(--soft); }
+      @media (max-width: 980px) {
+        .collage { grid-template-columns: 1fr 1fr; }
+        .tile.grade, .tile.control { grid-column: span 1; }
+        .notes { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 800px) {
+        .detail { grid-template-columns: 1fr; height: auto; }
+        .shot-pane { max-height: 46vh; }
+        .collage { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="view-data.js"></script>
+    <script>
+      const EFFECT = { uses: 'Uses this', scale: 'Size only', unread: 'Unused' }
+      const CONTROLS = [
+        {
+          id: 'setup',
+          title: 'Sliders and switches',
+          kicker: 'Setting a practice',
+          image: 'shots/controls-setup.png',
+          lead: 'The name, the current value, the hint, and the range sit in one row. A switch is one click: teal, knob to the right, means on.',
+          rows: [
+            ['Slider', 'Moved the level to 5 and watched Digits go from 9 to 15.', 'Easy. Dragging the track is the whole interaction. The range, such as 4–15, is printed at the end of the row.'],
+            ['Switch', 'Turned on “Five-minute marks only” with one click. “Include a remainder” is the same control.', 'Easy. The hint sits under the name.'],
+            ['Back to usual settings', 'It sits under every variable list.', 'The label is clear. On a long list it sits at the bottom of a panel capped at 240px, so it is easy to miss until you scroll.'],
+          ],
+          after: 'A few hints do not match the label above them. “How many measures” and “How many numbers” both say “How many numbers or pieces appear in one question.” On a rounding practice, that hint is about a different idea than digits or place.',
+        },
+        {
+          id: 'places',
+          title: 'Round to',
+          kicker: 'The long choice list',
+          image: 'shots/controls-places.png',
+          lead: 'This is the only choice list in the settings. The kind of problem is the practice card, so it is not repeated here.',
+          rows: [
+            ['Round to', 'Opened the 15 places, from Any place through Hundred trillions.', 'Each pill is clear, and the selected one (Thousands) is teal. The names rhyme — Ten millions, Ten billions, Ten trillions — so scanning is slow. On the practice screen the list sits inside a panel capped at 240px, so you scroll inside the card to reach the later places.'],
+          ],
+        },
+        {
+          id: 'tray',
+          title: 'The practice row',
+          kicker: 'Begin, adjust, pin, remove',
+          image: 'shots/tray-controls.png',
+          lead: 'Begin stays a full-width button. Adjust, Pin, and Remove sit on one row and are easy to tell apart.',
+          rows: [
+            ['Difficulty', 'Chose 5 · Harder.', 'The click is easy, and it rewrote the other settings to that level’s presets. Levels 1 and 2 are both labeled “Easier,” and 4 and 5 are both labeled “Harder.” The number is the only difference.'],
+            ['Question count', 'Pressed + and the row went from 4 to 5, and Begin followed.', 'Easy. Minus, the count, plus. It stops at 1.'],
+            ['Adjust / Pin / Remove', 'Adjust opened the panel and renamed itself Done. Pin became Unpin and turned teal. Remove stays red at the end.', 'Easy to tell apart.'],
+          ],
+        },
+        {
+          id: 'keypad',
+          title: 'Answering',
+          kicker: 'Live round question',
+          image: 'shots/play-keypad.png',
+          lead: 'Check stays the large button. Finish session is a quiet text button. The header names the practice and the level.',
+          rows: [
+            ['Number keypad', '104 practices. Typed 6 on a live round question.', 'The easiest answer. Big keys, the number appears above them, C clears, backspace deletes. The corner key becomes a decimal, ±, or C. Both a decimal and a sign adds a wide ± under the pad.'],
+            ['Choice buttons', '30 practices.', 'One tap, full width. Equations wrap and stay easy to hit.'],
+            ['Fraction keypad', '23 practices.', 'Same pad, after you tap the part you are editing. A line says “Editing the numerator.” The whole-number box is easy to confuse with the numerator because both are large numerals.'],
+            ['Compare', '6 practices.', 'Three large buttons: <, =, >. Very easy.'],
+            ['Several fields, one keypad', '4 practices. A clock you read, or a quotient with a remainder.', 'Tap the field, then type. The field name is on the button.'],
+            ['Reorder', '3 practices.', 'Up and down only, named “up” and “down,” and there is no drag. The rows start shuffled. That order is submitted immediately, so Check works before a row moves, and that press is wrong.'],
+            ['Shade cells', '2 practices.', 'Tap a cell, the count updates. The bar is the picture.'],
+            ['Number line', '2 practices.', 'Tap or drag, it snaps, and the value is written underneath. The line shows the two ends and no ticks between them.'],
+            ['Clock hands', '2 practices.', 'Choose Hours or Minutes, then drag. The digital time tells you whether you hit it. Minutes are a small target.'],
+            ['Build a chart', '2 practices.', 'The crowded one: axis, size, bars or line, drag, plus and minus, six colors. Size and bars-versus-line are not marked. The heights are, the axis has to fit, and the middle bar has to stay teal. Heights start at 0 and are submitted immediately.'],
+            ['Coordinate plane', '2 practices.', 'Tap the grid. It snaps to whole numbers. A wide grid makes the exact point fiddly.'],
+            ['Place-value digits', '2 practices.', 'Typing advances to the next column. At 15 digits the row scrolls sideways. Every column starts at 0, so an untouched column looks like a chosen zero.'],
+            ['Angle drag', '1 practice.', 'No arc and no ticks, so 40° is hard to hit by eye. It starts at 0°, and that 0° is submitted immediately.'],
+            ['Ratio blocks', '1 practice.', 'Two piles, minus and plus. It starts at 1 and 1, and that pair is submitted immediately. When the two parts of the target are equal, 1:1 is already right. A ratio like 3:10 is a run of taps.'],
+          ],
+        },
+      ]
+
+      const SUGGESTIONS = [
+        ['3.OA.A, 3.OA.D, 4.OA.A stories', 'What is unknown: the total, the number of groups, or the size of a group', 'The stories already hide one of those. A picture of the groups would also replace the market / bay strip.'],
+        ['3.OA.C Facts', 'Which tables: 2s, 5s, 10s, or all', 'Largest factor sets the ceiling. It does not let a student stay on one table.'],
+        ['3.NBT.A, 4.NBT.B', 'Must regroup', 'That is the extra step these questions actually have.'],
+        ['3.NF.A', 'Model: bar, circle, or set', 'Shade and name are the same fraction idea in different pictures. The denominator slider is already the right size control.'],
+        ['3.MD.A Estimate', 'What you estimate: mass, liquid, or length', 'The card is the words 2 kg, and the question is a list of units.'],
+        ['3.G.A Name', 'Wire “Pentagons and hexagons,” or let Number of sides be the only control', 'The switch is on and unused. The sides slider does the work.'],
+        ['4.MD.C Angles', 'Largest degree, and a step of 1° or 5°', '“Largest measure” does not say degrees, and the drag control has no ticks to aim at.'],
+        ['4.NF.A Equivalent', 'Keep simplest form, and stop appending the sentence when the prompt already says it', 'The switch itself is the right variable.'],
+        ['5.MD.C Volume', 'Unit cubes shown, or the formula only', 'The prism picture is there. Whether the cubes are drawn is the interesting choice.'],
+        ['6.RP.A', 'Model: tape, table, or double number line', 'Build, missing, unit, and percent are the right kinds. The picture is still mostly the ratio written out.'],
+        ['6.SP.B, 7.SP.B', 'Include an outlier', '“An extra step” is the closest current switch, and it does not mean an outlier.'],
+        ['7.EE.B', 'Variable on both sides', 'One-step, two-step, and inequality are covered. Both sides is the next real fork.'],
+        ['7.G.A Scale', 'Drop “Number of sides” here', 'Largest scale factor matches the pictures. Sides only nudges the random range.'],
+        ['7.G.B Circles', 'Pi as 3.14 or as 22/7', 'Radius is already the right size slider.'],
+        ['7.SP.C Probability', 'How many equal sectors', 'The spinner questions use a fixed spinner. “How many charts” does not change it.'],
+      ]
+
+      const shots = [
+        ...window.REVIEW.grades.map((grade) => ({ ...grade, kind: 'grade' })),
+        ...CONTROLS.map((item) => ({ ...item, kind: 'control' })),
+      ]
+
+      const app = document.querySelector('#app')
+      const esc = (value) => String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch])
+
+      function collage() {
+        app.innerHTML = `
+          <header class="top wrap">
+            <p class="brand"><b>Frau</b> <em>Chimbo</em></p>
+            <h1>Practice review</h1>
+            <p class="lede">184 practices, grades 3–7. The screenshots are below. Click one to read that grade or that control in full. Nothing in the practices was changed.</p>
+          </header>
+          <section class="section wrap">
+            <h2>All the screenshots</h2>
+            <div class="collage">
+              ${shots.map((shot) => `
+                <button class="tile ${shot.kind}" data-open="${esc(shot.id)}">
+                  <span class="frame"><img src="${esc(shot.image)}" alt="${esc(shot.title)}" /></span>
+                  <span class="tile-copy"><strong>${esc(shot.title)}</strong><small>${esc(shot.kicker)}</small></span>
+                </button>`).join('')}
+            </div>
+          </section>
+          <section class="section wrap">
+            <div class="notes">
+              <article class="card">
+                <h2>Visuals</h2>
+                <p>The card pictures are the strongest part. They share one drawing style, coral, teal, gold, and a paper card, and an operation is readable at a glance. The better pictures are objects: clocks, fraction bars, charts, grids, rectangles, place-value boxes.</p>
+                <p>The question under the card is often thinner. <b>102</b> practices have no figure in the stem. <b>29</b> show the expression. <b>10</b> stories are a tinted strip labeled market, bay, sky, or kitchen. Ten empty stems put the figure in the answer control. The other <b>43</b> draw a real object.</p>
+              </article>
+              <article class="card">
+                <h2>Variables</h2>
+                <p>The generators read <b>251</b> settings. <b>366</b> are fillers such as “How many numbers,” “An extra step,” and “A harder mix.” Those mostly change how large a random number can be.</p>
+                <p>One switch is unused: <b>Pentagons and hexagons</b> on 3.G.A Name. Number of sides is the slider that brings those shapes in. On 4.NF.A Equivalent, simplest form is appended onto a prompt that already says it.</p>
+              </article>
+            </div>
+          </section>
+          <section class="section wrap">
+            <h2>Settings I would add</h2>
+            <div class="suggest">
+              <table>
+                <thead><tr><th>Skill</th><th>Setting</th><th>Why</th></tr></thead>
+                <tbody>
+                  ${SUGGESTIONS.map((row) => `<tr>${row.map((cell) => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('')}
+                </tbody>
+              </table>
+            </div>
+          </section>`
+      }
+
+      function variable(item) {
+        const levels = item.levels.map((level, index) => `<i class="${index === 2 ? 'on' : ''}">${esc(level)}</i>`).join('')
+        const options = item.options.length ? `<div class="pills">${item.options.map((option) => `<i>${esc(option)}</i>`).join('')}</div>` : ''
+        return `
+          <div class="var">
+            <div class="usual">${esc(item.usual)}<small>level 3</small></div>
+            <div>
+              <div class="var-top">
+                <strong>${esc(item.label)}</strong>
+                <code>${esc(item.id)}</code>
+                <span class="badge ${item.effect}">${EFFECT[item.effect]}</span>
+              </div>
+              <p class="hint">${esc(item.control)}. ${esc(item.hint)}</p>
+              ${item.when ? `<p class="when">Shown ${esc(item.when)}.</p>` : ''}
+              <div class="levels" aria-label="Levels 1 to 5">${levels}</div>
+              ${options}
+            </div>
+          </div>`
+      }
+
+      function gradeBody(shot) {
+        return `
+          <div class="legend">
+            <span class="uses">Uses this</span>
+            <span class="scale">Size only</span>
+            <span class="unread">Unused</span>
+          </div>
+          <p class="lede">The dark chip is level 3, “On level.” A clock practice can list “How many measures” because the estimate question in the same skill is the one that reads it. The sample sentence is one draw.</p>
+          <div class="toolbar">
+            <input id="find" type="search" placeholder="Find a practice or a setting" aria-label="Find a practice" />
+            <div class="skills">
+              ${shot.skills.map((skill) => `<button class="jump" data-skill="${esc(skill.code)}">${esc(skill.code)}</button>`).join('')}
+            </div>
+          </div>
+          ${shot.skills.map((skill) => `
+            <section class="skill" id="skill-${esc(skill.code)}">
+              <header>
+                <p class="kicker">${esc(skill.code)}</p>
+                <h3>${esc(skill.title)}</h3>
+                <p>${esc(skill.blurb)}</p>
+              </header>
+              ${skill.practices.map((practice) => `
+                <article class="practice" data-hay="${esc(`${skill.code} ${skill.title} ${practice.title} ${practice.sample} ${practice.variables.map((item) => item.label).join(' ')}`.toLowerCase())}">
+                  <h4>${esc(practice.title)}</h4>
+                  <p class="sample">${esc(practice.sample)}</p>
+                  <p class="meta"><span>Picture <b>${esc(practice.picture)}</b></span><span>Answer <b>${esc(practice.control)}</b></span></p>
+                  ${practice.variables.map(variable).join('')}
+                </article>`).join('')}
+            </section>`).join('')}`
+      }
+
+      function controlBody(shot) {
+        return `
+          <p class="lede">${esc(shot.lead)}</p>
+          ${shot.rows.map((row) => `
+            <article class="practice control-block">
+              <h3>${esc(row[0])}</h3>
+              <p class="did">${esc(row[1])}</p>
+              <p class="feel">${esc(row[2])}</p>
+            </article>`).join('')}
+          ${shot.after ? `<p>${esc(shot.after)}</p>` : ''}`
+      }
+
+      function detail(id) {
+        const shot = shots.find((item) => item.id === id)
+        if (!shot) { collage(); return }
+        app.innerHTML = `
+          <div class="stage">
+            <div class="strip-bar">
+              <button class="back" data-open="">All screenshots</button>
+              <div class="strip">
+                ${shots.map((item) => `
+                  <button class="thumb" data-open="${esc(item.id)}" ${item.id === id ? 'aria-current="true"' : ''} aria-label="${esc(item.title)}">
+                    <img src="${esc(item.image)}" alt="" />
+                  </button>`).join('')}
+              </div>
+            </div>
+            <div class="detail">
+              <div class="pane shot-pane"><img src="${esc(shot.image)}" alt="${esc(shot.title)}" /></div>
+              <div class="pane text-pane">
+                <p class="kicker">${esc(shot.kicker)}</p>
+                <h2>${esc(shot.title)}</h2>
+                ${shot.kind === 'grade' ? gradeBody(shot) : controlBody(shot)}
+              </div>
+            </div>
+          </div>`
+        const current = app.querySelector('.thumb[aria-current="true"]')
+        current?.scrollIntoView({ inline: 'center', block: 'nearest' })
+      }
+
+      app.addEventListener('click', (event) => {
+        const open = event.target.closest('[data-open]')
+        if (open) {
+          location.hash = open.dataset.open
+          return
+        }
+        const jump = event.target.closest('[data-skill]')
+        if (jump) {
+          document.querySelectorAll('.jump').forEach((button) => button.removeAttribute('aria-current'))
+          jump.setAttribute('aria-current', 'true')
+          document.getElementById(`skill-${jump.dataset.skill}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      })
+
+      app.addEventListener('input', (event) => {
+        if (event.target.id !== 'find') return
+        const query = event.target.value.trim().toLowerCase()
+        app.querySelectorAll('.practice').forEach((card) => {
+          card.hidden = query.length > 0 && !card.dataset.hay.includes(query)
+        })
+        app.querySelectorAll('.skill').forEach((skill) => {
+          skill.hidden = ![...skill.querySelectorAll('.practice')].some((card) => !card.hidden)
+        })
+      })
+
+      addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && location.hash) location.hash = ''
+      })
+
+      function show() {
+        const id = decodeURIComponent(location.hash.slice(1))
+        if (!id) collage()
+        else detail(id)
+      }
+      addEventListener('hashchange', show)
+      show()
+    </script>
+  </body>
+</html>
