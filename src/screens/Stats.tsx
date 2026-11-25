@@ -253,7 +253,7 @@ export function Stats() {
           <div className="split" style={{ marginTop: 12 }}>
             <section className="card pad st-card">
               <h2>{t(locale, 'stats.strengths')}</h2>
-              <SkillList rows={strengths} empty={t(locale, 'stats.none')} locale={locale} onOpen={(skillId) => setRoute({ name: 'play', skillId, auto: true, difficulty: 5 })} />
+              <SkillList rows={strengths} empty={t(locale, 'stats.strengths.none')} locale={locale} onOpen={(skillId) => setRoute({ name: 'play', skillId, auto: true, difficulty: 5 })} />
             </section>
             <section className="card pad st-card">
               <h2>{t(locale, 'stats.growth')}</h2>

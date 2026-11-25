@@ -1,11 +1,13 @@
 import { defaultKnobs } from '../data/skills'
 import type { KnobValues, Skill } from './types'
 
-// Level numbers still set the starting values. They are shown as words only, never as a row of choices.
+// Level numbers still set the starting values. Each level has its own clear label.
 export function levelKey(level: number) {
-  if (level <= 2) return 'lvl.easy'
-  if (level === 3) return 'lvl.base'
-  return 'lvl.hard'
+  if (level <= 1) return 'lvl.1'
+  if (level === 2) return 'lvl.2'
+  if (level === 3) return 'lvl.3'
+  if (level === 4) return 'lvl.4'
+  return 'lvl.5'
 }
 
 // The name for a set of settings: the level's name while untouched, otherwise "Custom".

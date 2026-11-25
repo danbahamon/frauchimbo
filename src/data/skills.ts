@@ -988,7 +988,7 @@ const RAW_SKILLS: Skill[] = [
     knobs: [
       mode(
         [
-          opt('plot', 'Plot', 'Setzen', 'Marcar'),
+          opt('plot', 'Plot', 'Punkt setzen', 'Marcar'),
           opt('read', 'Read', 'Ablesen', 'Leer'),
           opt('distance', 'Distance', 'Abstand', 'Distancia'),
         ],
@@ -1024,21 +1024,21 @@ const RAW_SKILLS: Skill[] = [
     grade: 6,
     domain: 'RP',
     code: '6.RP.A',
-    title: L('Ratios, rates, and percent', 'Verhältnisse, Raten und Prozent', 'Razones, tasas y porcentaje'),
-    blurb: L('Build an equivalent ratio, find a missing term, a unit rate, or a percent.', 'Ein gleichwertiges Verhältnis bauen, ein Glied, eine Rate oder einen Prozentsatz finden.', 'Armar una razón equivalente, hallar un término, una tasa o un porcentaje.'),
+    title: L('Ratios, rates, and percent', 'Verhältnisse und Prozent', 'Razones, tasas y porcentaje'),
+    blurb: L('Build an equivalent ratio, find a missing term, a unit rate, or a percent.', 'Ein gleichwertiges Verhältnis bauen, eine fehlende Zahl, den Wert pro Einheit oder Prozent finden.', 'Armar una razón equivalente, hallar un término, una tasa o un porcentaje.'),
     months: [9, 10, 11, 6],
     prereq: ['5.nf.b'],
     knobs: [
       mode(
         [
           opt('build', 'Build a ratio', 'Verhältnis bauen', 'Armar una razón'),
-          opt('missing', 'Missing term', 'Fehlendes Glied', 'Término faltante'),
-          opt('unit', 'Unit rate', 'Einheitsrate', 'Tasa unitaria'),
+          opt('missing', 'Missing term', 'Fehlende Zahl', 'Término faltante'),
+          opt('unit', 'Unit rate', 'Pro Einheit', 'Tasa unitaria'),
           opt('percent', 'Percent of', 'Prozent von', 'Porcentaje de'),
         ],
         ['build', 'missing', 'unit', 'percent', 'missing'],
       ),
-      range('max', L('Largest ratio term', 'Größtes Verhältnisglied', 'Término mayor de la razón'), L('The biggest number in a ratio.', 'Die größte Zahl in einem Verhältnis.', 'El mayor número de una razón.'), 4, 48, [6, 10, 16, 24, 36], 1, showFor('mode', 'build', 'missing')),
+      range('max', L('Largest ratio term', 'Größte Zahl im Verhältnis', 'Término mayor de la razón'), L('The biggest number in a ratio.', 'Die größte Zahl in einem Verhältnis.', 'El mayor número de una razón.'), 4, 48, [6, 10, 16, 24, 36], 1, showFor('mode', 'build', 'missing')),
       range('whole', L('Largest whole number', 'Größte ganze Zahl', 'Entero mayor'), L('The biggest whole number in a rate or a percent.', 'Die größte ganze Zahl in einer Rate oder einem Prozentsatz.', 'El mayor entero en una tasa o un porcentaje.'), 20, 400, [40, 60, 100, 160, 240], 10, showFor('mode', 'unit', 'percent')),
     ],
   }),
@@ -1100,7 +1100,7 @@ const RAW_SKILLS: Skill[] = [
         [
           opt('compare', 'Compare', 'Vergleichen', 'Comparar'),
           opt('order', 'Order', 'Ordnen', 'Ordenar'),
-          opt('plot', 'Plot', 'Setzen', 'Marcar'),
+          opt('plot', 'Plot', 'Punkt setzen', 'Marcar'),
           opt('abs', 'Absolute value', 'Betrag', 'Valor absoluto'),
         ],
         ['abs', 'compare', 'order', 'plot', 'plot'],

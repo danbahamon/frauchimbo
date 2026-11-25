@@ -1,6 +1,17 @@
 import type { Answer, Attempt, GradeResult, Locale, MissKind, Question } from './types'
 import { tx } from './i18n'
-import { fractionValue } from './math'
+import { formatNumber, fractionValue, simplify } from './math'
+
+export function numberLineFraction(value: number, step: number): { n: number; d: number } | null {
+  if (!(step > 0)) return null
+  const den = Math.round(1 / step)
+  if (den <= 1) return null
+  const rawNum = Math.round(value * den)
+  if (Math.abs(rawNum / den - value) > 0.002) return null
+  if (rawNum === 0 || rawNum % den === 0) return null
+  const [n, d] = simplify(rawNum, den)
+  return { n, d }
+}
 
 // Turns math markup like [[3/4]] into plain text, so stored details read the same everywhere.
 export function plainText(text: string) {
@@ -11,7 +22,13 @@ export function plainText(text: string) {
 export function answerText(question: Question, answer: Answer | null, locale: Locale, blank: string): string {
   if (!answer) return blank
   const response = question.response
-  if (answer.kind === 'number') return String(answer.value)
+  if (answer.kind === 'number') {
+    if (response.type === 'numberline' && response.fraction) {
+      const frac = numberLineFraction(answer.value, response.step)
+      if (frac) return `${frac.n}/${frac.d}`
+    }
+    return formatNumber(locale, answer.value)
+  }
   if (answer.kind === 'fraction') return `${answer.whole ? `${answer.whole} ` : ''}${answer.n}/${answer.d}`
   if (answer.kind === 'compare') return answer.sign
   if (answer.kind === 'choice' && response.type === 'choice') {
@@ -75,7 +92,18 @@ export function classifyMiss(expected: Answer, given: Answer | null, grade: Grad
       const other = given.points[index]
       return other !== undefined && other.x === point.y && other.y === point.x
     })
-    return swapped ? 'place' : 'read'
+    if (swapped) return 'place'
+    const signFlip = expected.points.length > 0 && expected.points.every((point, index) => {
+      const other = given.points[index]
+      return other !== undefined && Math.abs(other.x) === Math.abs(point.x) && Math.abs(other.y) === Math.abs(point.y)
+    })
+    if (signFlip) return 'sign'
+    const near = expected.points.length > 0 && expected.points.every((point, index) => {
+      const other = given.points[index]
+      return other !== undefined && Math.abs(other.x - point.x) + Math.abs(other.y - point.y) <= 2
+    })
+    if (near) return 'close'
+    return 'read'
   }
   if (expected.kind === 'digits' && given.kind === 'digits') {
     const sorted = (list: number[]) => [...list].sort().join('')

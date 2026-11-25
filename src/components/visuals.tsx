@@ -1,6 +1,8 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { Locale, Question, ShapeKind, Stimulus } from '../lib/types'
-import { tx } from '../lib/i18n'
+import { t, tx } from '../lib/i18n'
+import { formatNumber } from '../lib/math'
+import { numberLineFraction } from '../lib/review'
 import { Expr, MathText, Tx } from './MathText'
 import { ShadeBar } from './ShadeBar'
 
@@ -83,10 +85,32 @@ export function StimulusView({ stimulus, locale }: { stimulus?: Stimulus; locale
   if (!stimulus) return null
   if (stimulus.type === 'expression') return <div className="figure"><Expr parts={stimulus[locale]} /></div>
   if (stimulus.type === 'scene') {
+    const icon =
+      stimulus.tone === 'sky' ? (
+        <svg viewBox="0 0 36 22" width="36" height="22" aria-hidden="true">
+          <path d="M8 16h18a5 5 0 0 0 .5-9.98A7 7 0 0 0 13 5.5 5 5 0 0 0 8 16z" fill="currentColor" opacity="0.22" />
+          <path d="M5 10c2.2-2.2 4.5-2.2 6.2 0 1.7-2.2 4-2.2 6.2 0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      ) : stimulus.tone === 'bay' ? (
+        <svg viewBox="0 0 36 22" width="36" height="22" aria-hidden="true">
+          <path d="M3 13c3-3 6-3 9 0s6 3 9 0 6-3 9 0 3 2 4 1" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M6 18c3-2.5 6-2.5 9 0s6 2.5 9 0 6-2.5 9 0" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.55" strokeLinecap="round" />
+        </svg>
+      ) : stimulus.tone === 'kitchen' ? (
+        <svg viewBox="0 0 36 22" width="36" height="22" aria-hidden="true">
+          <path d="M8 12h20a10 10 0 0 1-20 0z" fill="currentColor" opacity="0.22" stroke="currentColor" strokeWidth="1.7" />
+          <path d="M14 5c0 2 1 2 1 4M20 4c0 2 1 2 1 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 36 22" width="36" height="22" aria-hidden="true">
+          <path d="M6 10h24l-2 9H8z" fill="currentColor" opacity="0.2" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+          <path d="M12 10c0-4 12-4 12 0" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+      )
     return (
       <div className="scene" data-tone={stimulus.tone}>
-        <span>{stimulus.tone === 'bay' ? '∼' : stimulus.tone === 'sky' ? '↑' : stimulus.tone === 'kitchen' ? '⌘' : '•'}</span>
-        <span className="fine">{stimulus.tone}</span>
+        {icon}
+        <span className="fine">{t(locale, `scene.${stimulus.tone}`)}</span>
       </div>
     )
   }
@@ -278,19 +302,42 @@ export function planeMap(xMin: number, xMax: number, yMin: number, yMax: number)
   return { w, h, sx, sy, fromPixel }
 }
 
+function axisStep(span: number) {
+  if (span <= 12) return 1
+  if (span <= 24) return 2
+  if (span <= 50) return 5
+  return 10
+}
+
 // Empty coordinate plane: grid, axes, and labels. It never draws a target point.
 export function PlaneGrid({ xMin, xMax, yMin, yMax, className = 'plane', onPointerDown, onPointerMove, children }: { xMin: number; xMax: number; yMin: number; yMax: number; className?: string; onPointerDown?: (event: ReactPointerEvent<SVGSVGElement>) => void; onPointerMove?: (event: ReactPointerEvent<SVGSVGElement>) => void; children?: ReactNode }) {
   const { w, h, sx, sy } = planeMap(xMin, xMax, yMin, yMax)
+  const xSpan = xMax - xMin
+  const ySpan = yMax - yMin
+  const xStep = axisStep(xSpan)
+  const yStep = axisStep(ySpan)
   const lines: ReactNode[] = []
-  for (let x = xMin; x <= xMax; x++) lines.push(<line key={`x${x}`} x1={sx(x)} y1={16} x2={sx(x)} y2={h - 16} stroke="#eadfce" />)
-  for (let y = yMin; y <= yMax; y++) lines.push(<line key={`y${y}`} x1={16} y1={sy(y)} x2={w - 16} y2={sy(y)} stroke="#eadfce" />)
-  const xStep = xMax - xMin > 12 ? 2 : 1
-  const yStep = yMax - yMin > 12 ? 2 : 1
+  const gridStepX = xSpan > 30 ? xStep : 1
+  const gridStepY = ySpan > 30 ? yStep : 1
+  for (let x = Math.ceil(xMin / gridStepX) * gridStepX; x <= xMax; x += gridStepX) {
+    lines.push(<line key={`x${x}`} x1={sx(x)} y1={16} x2={sx(x)} y2={h - 16} stroke="var(--grid-line, #eadfce)" strokeWidth={x % xStep === 0 ? 1.1 : 0.7} />)
+  }
+  for (let y = Math.ceil(yMin / gridStepY) * gridStepY; y <= yMax; y += gridStepY) {
+    lines.push(<line key={`y${y}`} x1={16} y1={sy(y)} x2={w - 16} y2={sy(y)} stroke="var(--grid-line, #eadfce)" strokeWidth={y % yStep === 0 ? 1.1 : 0.7} />)
+  }
   const labels: ReactNode[] = []
-  for (let x = xMin; x <= xMax; x += xStep) labels.push(<text key={`lx${x}`} x={sx(x)} y={Math.min(h - 4, sy(0) + 14)} textAnchor="middle" fontSize="11" fill="currentColor">{x}</text>)
-  for (let y = yMin; y <= yMax; y += yStep) {
+  const xStart = Math.ceil(xMin / xStep) * xStep
+  for (let x = xStart; x <= xMax; x += xStep) {
+    if (x === 0 && xMin < 0 && xMax > 0) continue
+    labels.push(<text key={`lx${x}`} x={sx(x)} y={Math.min(h - 4, sy(0) + 14)} textAnchor="middle" fontSize="10" fill="currentColor">{x}</text>)
+  }
+  const yStart = Math.ceil(yMin / yStep) * yStep
+  for (let y = yStart; y <= yMax; y += yStep) {
     if (y === 0) continue
-    labels.push(<text key={`ly${y}`} x={Math.max(10, sx(0) - 8)} y={sy(y) + 4} textAnchor="end" fontSize="11" fill="currentColor">{y}</text>)
+    labels.push(<text key={`ly${y}`} x={Math.max(12, sx(0) - 6)} y={sy(y) + 3.5} textAnchor="end" fontSize="10" fill="currentColor">{y}</text>)
+  }
+  if (xMin <= 0 && xMax >= 0 && yMin <= 0 && yMax >= 0) {
+    labels.push(<text key="origin" x={sx(0) - 5} y={Math.min(h - 4, sy(0) + 13)} textAnchor="end" fontSize="10" opacity="0.7" fill="currentColor">0</text>)
   }
   const interactive = Boolean(onPointerDown)
   return (
@@ -343,7 +390,17 @@ function entryBand(length: number) {
 export function AnswerFace({ question, answer, locale, blank }: { question: Question; answer: Question['answer'] | null; locale: Locale; blank: string }) {
   if (!answer) return <div className="entry">{blank}</div>
   if (answer.kind === 'number') {
-    const text = String(answer.value)
+    if (question.response.type === 'numberline' && question.response.fraction) {
+      const frac = numberLineFraction(answer.value, question.response.step)
+      if (frac) {
+        return (
+          <div className="entry fraction-entry">
+            <span className="frac"><b>{frac.n}</b><i>{frac.d}</i></span>
+          </div>
+        )
+      }
+    }
+    const text = formatNumber(locale, answer.value)
     return <div className="entry num" data-long={entryBand(text.length)}>{text}</div>
   }
   if (answer.kind === 'fraction') {

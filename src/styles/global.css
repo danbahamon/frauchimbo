@@ -5,6 +5,7 @@
   --paper: #fffaf3;
   --card: rgba(255, 250, 243, 0.92);
   --line: rgba(28, 23, 18, 0.12);
+  --grid-line: #e4d8c5;
   --coral: #e25b45;
   --coral-deep: #c2412d;
   --teal: #0f766e;
@@ -43,6 +44,7 @@
   --paper: #221c17;
   --card: rgba(42, 35, 29, 0.92);
   --line: rgba(246, 239, 230, 0.12);
+  --grid-line: rgba(246, 239, 230, 0.14);
   --teal-soft: #163632;
   --gold-soft: #3a2e10;
   --indigo-soft: #232846;
@@ -470,7 +472,7 @@ h2 { font-size: 1.15rem; margin: 0 0 6px; overflow-wrap: break-word; }
   left: 50%;
   bottom: calc(var(--dock) + 16px);
   transform: translateX(-50%);
-  z-index: 12;
+  z-index: 40;
   width: max-content;
   max-width: min(92vw, 440px);
   margin: 0;
@@ -482,6 +484,48 @@ h2 { font-size: 1.15rem; margin: 0 0 6px; overflow-wrap: break-word; }
   font-weight: 600;
   text-align: center;
   animation: toast-in .42s cubic-bezier(.2, .8, .2, 1) both;
+}
+.share-url {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.scratch-wrap {
+  margin-top: 12px;
+}
+.scratch-toggle {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+.scratch-pad {
+  position: relative;
+  margin-top: 8px;
+  border: 1.5px dashed color-mix(in srgb, var(--ink) 28%, transparent);
+  border-radius: 16px;
+  background-color: color-mix(in srgb, var(--paper) 92%, var(--gold-soft));
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: 20px 20px;
+  overflow: hidden;
+}
+.scratch-canvas {
+  display: block;
+  width: 100%;
+  height: 170px;
+  color: var(--ink);
+  touch-action: none;
+  cursor: crosshair;
+}
+.scratch-hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  opacity: 0.65;
 }
 .scene {
   display: flex;

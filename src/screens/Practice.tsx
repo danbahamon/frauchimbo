@@ -3,7 +3,7 @@ import { DOMAIN_COLOR, SKILLS, getSkill } from '../data/skills'
 import { statsBySkill } from '../engine/insights'
 import type { BlueprintItem, DomainId, Grade } from '../lib/types'
 import { DOMAIN_ORDER } from '../lib/types'
-import { t, tx } from '../lib/i18n'
+import { t, tCount, tx } from '../lib/i18n'
 import { levelKey, settingsKey } from '../lib/levels'
 import { positionDifficulty } from '../lib/math'
 import { skillMatches } from '../lib/search'
@@ -123,7 +123,7 @@ export function Practice() {
       {tray.length ? (
         <div className="practice-go">
           <button type="button" className="primary wide" onClick={start}>
-            <Icon name="forward" /> {t(locale, 'practice.start', { n: total })}
+            <Icon name="forward" /> {tCount(locale, 'practice.start', total)}
           </button>
         </div>
       ) : null}
@@ -206,7 +206,7 @@ export function Practice() {
                 <button key={item} type="button" className="strand-card" style={{ ['--wash' as string]: DOMAIN_COLOR[item], animationDelay: `${index * 40}ms` }} onClick={() => setDomain(item)}>
                   <SkillDemo domain={item} />
                   <b>{t(locale, `domain.${item}`)}</b>
-                  <small>{t(locale, 'practice.count', { n: count })}</small>
+                  <small>{tCount(locale, 'practice.count', count)}</small>
                 </button>
               )
             })}

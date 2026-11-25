@@ -9,7 +9,7 @@ import { levelKey, settingsKey } from '../lib/levels'
 import { attemptDetail } from '../lib/review'
 import type { ActiveTest, Answer, Blueprint, BlueprintItem, DomainId, Grade, KnobValues, Locale, Skill, TestRecord } from '../lib/types'
 import { DOMAIN_ORDER } from '../lib/types'
-import { monthName, t, tx } from '../lib/i18n'
+import { monthName, t, tCount, tx } from '../lib/i18n'
 import { monthIndex, uid } from '../lib/math'
 import { skillMatches } from '../lib/search'
 import { identityPath, knobsForPath, matchesPath, nextLayer, squareIds, unitKey, unitTitle, unitVariant } from '../lib/units'
@@ -22,6 +22,7 @@ import { Mascot } from '../components/Mascot'
 import { SkillDemo } from '../components/Preview'
 import { Icon } from '../components/Icon'
 import { UnitSquares } from '../components/UnitSquares'
+import { Scratchpad } from '../components/Scratchpad'
 
 const GRADES: Grade[] = [3, 4, 5, 6, 7]
 const CAP = TEST_CAP
@@ -256,16 +257,16 @@ function Builder() {
         {wide ? (
           <article className="month-stage">
             <p className="muted">{t(locale, span === 'half' ? 'test.half.note' : 'test.year.note')}</p>
-            <p className="fine">{t(locale, 'test.tray', { n: wideCount })}</p>
+            <p className="fine">{tCount(locale, 'test.tray', wideCount)}</p>
             <button type="button" className="primary" onClick={() => go(wide)}>{t(locale, 'test.startCheck')}</button>
             <button type="button" className="text-btn" onClick={() => openTray(wide)}>{t(locale, 'test.customize')}</button>
           </article>
         ) : preset && month ? (
           <article className="month-stage" data-now={month === reached}>
             <div className="month-nav">
-              <button type="button" className="icon-btn" aria-label={t(locale, 'on.back')} disabled={monthAt <= 0} onClick={() => setMonthAt((value) => Math.max(0, value - 1))}><Icon name="back" /></button>
+              <button type="button" className="icon-btn" aria-label={t(locale, 'test.prevMonth')} disabled={monthAt <= 0} onClick={() => setMonthAt((value) => Math.max(0, value - 1))}><Icon name="back" /></button>
               <b>{monthName(locale, month)}</b>
-              <button type="button" className="icon-btn" aria-label={t(locale, 'play.next')} disabled={monthAt >= months.length - 1} onClick={() => setMonthAt((value) => Math.min(months.length - 1, value + 1))}><span className="flip"><Icon name="back" /></span></button>
+              <button type="button" className="icon-btn" aria-label={t(locale, 'test.nextMonth')} disabled={monthAt >= months.length - 1} onClick={() => setMonthAt((value) => Math.min(months.length - 1, value + 1))}><span className="flip"><Icon name="back" /></span></button>
             </div>
             <p className="muted">{tx(locale, preset.note)}</p>
             <button type="button" className="primary" onClick={() => go(materialize(preset))}>{t(locale, 'test.startCheck')}</button>
@@ -350,7 +351,7 @@ function Builder() {
         <p className="muted">{t(locale, 'test.mode.progress.sub')}</p>
         {recorded ? (
           <>
-            <p className="fine">{t(locale, 'test.progress.have', { n: recorded })}</p>
+            <p className="fine">{tCount(locale, 'test.progress.have', recorded)}</p>
             <div className="segment wrap" style={{ marginTop: 12 }}>
               {[5, 10, 15, 20, 30].filter((item) => item <= recorded).map((item) => (
                 <button key={item} type="button" data-on={chosen === item} onClick={() => setMistakeCount(item)}>{item}</button>
@@ -363,7 +364,7 @@ function Builder() {
                 <button type="button" disabled={chosen >= Math.min(recorded, CAP)} onClick={() => setMistakeCount(Math.min(CAP, chosen + 1))}>+</button>
               </span>
             </p>
-            <p className="muted">{t(locale, 'test.progress.using', { n: chosen })}</p>
+            <p className="muted">{tCount(locale, 'test.progress.using', chosen)}</p>
             <div className="list">
               {shown.map((item, index) => {
                 const skill = getSkill(item.skillId)
@@ -371,7 +372,7 @@ function Builder() {
                 return (
                   <p key={`${item.skillId}-${index}`} className="fine">
                     <b>{kind || (skill ? tx(locale, skill.title) : item.skillId)}</b>
-                    {kind && skill ? ` · ${tx(locale, skill.title)}` : ''} · {t(locale, 'test.tray', { n: item.count })}
+                    {kind && skill ? ` · ${tx(locale, skill.title)}` : ''} · {tCount(locale, 'test.tray', item.count)}
                   </p>
                 )
               })}
@@ -439,7 +440,7 @@ function Builder() {
         <button type="button" data-on={everyGrade} onClick={() => setEveryGrade(true)}>{t(locale, 'test.allGrades')}</button>
       </div>
       <input className="field" style={{ marginTop: 12 }} value={title} placeholder={t(locale, 'test.title.ph')} onChange={(event) => setTitle(event.target.value)} />
-      <p className="fine">{t(locale, 'test.tray', { n: total })}</p>
+      <p className="fine">{tCount(locale, 'test.tray', total)}</p>
       {tray.length ? (
         <div className="tray">
           {tray.map((item, index) => {
@@ -542,7 +543,7 @@ function Builder() {
                     <SkillDemo domain={skill.domain} skillId={skill.id} />
                     <small>{everyGrade ? `${t(locale, 'grade.n', { n: skill.grade })} · ${skill.code}` : skill.code}</small>
                     <b>{tx(locale, skill.title)}</b>
-                    <span>{count ? t(locale, 'test.tray', { n: count }) : t(locale, 'test.pickKind')}</span>
+                    <span>{count ? tCount(locale, 'test.tray', count) : t(locale, 'test.pickKind')}</span>
                   </button>
                 )
               })}
@@ -728,11 +729,12 @@ function Runner() {
         <div className="swap" key={question.id} style={{ marginTop: 8 }}>
           <div className="q-meta">
             <h2 className="q-num">{t(locale, 'test.q', { n: active.index + 1 })}</h2>
-            {skill ? <span className="fine">{skill.code}</span> : null}
+            {skill ? <span className="fine">{tx(locale, skill.title)}</span> : null}
           </div>
           <p className="prompt"><MathText text={tx(locale, question.prompt)} /></p>
           <StimulusView stimulus={question.stimulus} locale={locale} />
           <AnswerWidget key={question.id} response={question.response} locale={locale} initial={active.responses[active.index]} onChange={save} />
+          <Scratchpad locale={locale} resetKey={question.id} />
           <nav className="nav-row" aria-label={t(locale, 'test.focus')}>
             <button type="button" className="ghost" disabled={active.index === 0} onClick={() => jump(active.index - 1)}><Icon name="back" />{t(locale, 'on.back')}</button>
             <span className="fine nav-count">{active.index + 1} / {total}</span>
@@ -826,11 +828,20 @@ function Investigate() {
       <div className="compare-grid">
         {order.map((which, card) => (
           <button key={which} type="button" className={picked === which ? 'hunt-card picked' : 'hunt-card'} onClick={() => choose(which)}>
-            <small>{t(locale, 'inv.card', { n: card + 1 })}</small>
+            <small>
+              {picked
+                ? t(locale, which === 'mine' ? 'inv.yours' : 'inv.correct')
+                : t(locale, 'inv.card', { n: card + 1 })}
+            </small>
             <AnswerFace question={question} answer={which === 'mine' ? test.responses[index] : question.answer} locale={locale} blank={t(locale, 'inv.blank')} />
           </button>
         ))}
       </div>
+      {!picked ? (
+        <div className="row" style={{ marginTop: 12 }}>
+          <button type="button" className="text-btn" onClick={done}>{t(locale, 'inv.skip')}</button>
+        </div>
+      ) : null}
       {picked ? (
         <div className={picked === 'mine' ? 'feedback ok' : 'feedback no'}>
           <b>{t(locale, picked === 'mine' ? 'inv.spot' : 'inv.miss')}</b>
@@ -998,7 +1009,7 @@ function Shared() {
           return (
             <article key={`${item.skillId}-${index}`} className="card pad">
               <b>{kind || (skill ? tx(locale, skill.title) : item.skillId)}</b>
-              <p className="fine">{skill && kind ? `${tx(locale, skill.title)} · ` : ''}{t(locale, 'test.tray', { n: item.count })}{skill ? ` · ${t(locale, settingsKey(skill, item.difficulty, item.knobs, squareIds(skill)))}` : ''}</p>
+              <p className="fine">{skill && kind ? `${tx(locale, skill.title)} · ` : ''}{tCount(locale, 'test.tray', item.count)}{skill ? ` · ${t(locale, settingsKey(skill, item.difficulty, item.knobs, squareIds(skill)))}` : ''}</p>
             </article>
           )
         })}

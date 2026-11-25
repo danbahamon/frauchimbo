@@ -148,9 +148,31 @@ export function ShareModal() {
     try {
       await navigator.clipboard.writeText(link)
       flash(t(locale, 'share.copied'))
+      return
     } catch {
-      flash(link)
+      /* fallback below */
     }
+    try {
+      const area = document.createElement('textarea')
+      area.value = link
+      area.style.position = 'fixed'
+      area.style.opacity = '0'
+      document.body.appendChild(area)
+      area.focus()
+      area.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(area)
+      if (ok) {
+        flash(t(locale, 'share.copied'))
+        return
+      }
+    } catch {
+      /* manual fallback */
+    }
+    const input = document.getElementById('share-link-field') as HTMLInputElement | null
+    input?.focus()
+    input?.select()
+    flash(t(locale, 'share.manual'))
   }
   const native = async () => {
     if (!navigator.share) return
@@ -163,8 +185,15 @@ export function ShareModal() {
         <h2>{tx(locale, share.title) || t(locale, 'share.title')}</h2>
         <p className="muted">{t(locale, 'share.note')}</p>
         {qr ? <img className="qr" src={qr} alt="" /> : null}
-        <p className="fine" style={{ wordBreak: 'break-all' }}>{link}</p>
-        <div className="row">
+        <input
+          id="share-link-field"
+          className="field share-url"
+          readOnly
+          value={link}
+          onFocus={(event) => event.currentTarget.select()}
+          aria-label={t(locale, 'share.title')}
+        />
+        <div className="row" style={{ marginTop: 10 }}>
           <button type="button" className="primary" onClick={() => void copy()}>{t(locale, 'share.copy')}</button>
           {typeof navigator.share === 'function' ? <button type="button" className="ghost" onClick={() => void native()}>{t(locale, 'share.native')}</button> : null}
           <button type="button" className="text-btn" onClick={closeShare}>{t(locale, 'share.close')}</button>

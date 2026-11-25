@@ -79,8 +79,27 @@ export function generateById(skillId: string, difficulty: number, knobs: KnobVal
   return generateQuestion(skill, difficulty, knobs)
 }
 
+function questionSignature(q: Question) {
+  return `${q.skillId}|${q.prompt.en}|${JSON.stringify(q.answer)}`
+}
+
 export function generateTest(items: BlueprintItem[]) {
-  return items.flatMap((item) =>
-    Array.from({ length: item.count }, () => generateById(item.skillId, item.difficulty, item.knobs)),
-  )
+  const seen = new Set<string>()
+  const result: Question[] = []
+  for (const item of items) {
+    for (let i = 0; i < item.count; i++) {
+      let picked = generateById(item.skillId, item.difficulty, item.knobs)
+      for (let tries = 0; tries < 12; tries++) {
+        const sig = questionSignature(picked)
+        if (!seen.has(sig)) {
+          seen.add(sig)
+          break
+        }
+        picked = generateById(item.skillId, item.difficulty, item.knobs)
+      }
+      seen.add(questionSignature(picked))
+      result.push(picked)
+    }
+  }
+  return result
 }

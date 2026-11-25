@@ -236,8 +236,6 @@ function CompareWidget({ response, locale, onChange, initial }: { response: Extr
 
 function OrderWidget({ response, locale, onChange, initial }: { response: Extract<Response, { type: 'order' }>; locale: Locale; onChange: (answer: Answer | null) => void; initial: string[] | null }) {
   const [ids, setIds] = useState(initial ?? response.items.map((item) => item.id))
-  const emit = useEmit(onChange)
-  useEffect(() => { emit.current({ kind: 'order', ids }) }, [ids, emit])
   const move = (index: number, dir: -1 | 1) => {
     const next = index + dir
     if (next < 0 || next >= ids.length) return
@@ -246,6 +244,7 @@ function OrderWidget({ response, locale, onChange, initial }: { response: Extrac
     copy[index] = copy[next]
     copy[next] = swap
     setIds(copy)
+    onChange({ kind: 'order', ids: copy })
   }
   return (
     <div className="stack">

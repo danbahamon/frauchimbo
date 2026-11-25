@@ -14,12 +14,32 @@ export function g6rp(ctx: Ctx) {
     ])
   }
   if (ctx.mode === 'unit') {
-    const hours = ctx.rng.int(2, 8)
+    const qty = ctx.rng.int(2, 8)
     const per = ctx.rng.int(4, Math.max(4, knobNum(ctx, 'whole', 40)))
-    return ask(ctx, L(`Pico flies ${n(per * hours).en} km in ${n(hours).en} hours. What is the speed in km per hour?`, `Pico fliegt ${n(per * hours).de} km in ${n(hours).de} Stunden. Wie groß ist die Geschwindigkeit in km pro Stunde?`, `Pico vuela ${n(per * hours).es} km en ${n(hours).es} horas. ¿Cuál es la velocidad en km por hora?`), { type: 'number' }, { kind: 'number', value: per }, [
-      L('Divide distance by time.', 'Teile Strecke durch Zeit.', 'Divide la distancia entre el tiempo.'),
-      L(`${n(per * hours).en} ÷ ${n(hours).en} = ${n(per).en}.`, `${n(per * hours).de} ÷ ${n(hours).de} = ${n(per).de}.`, `${n(per * hours).es} ÷ ${n(hours).es} = ${n(per).es}.`),
-    ], scene('sky'))
+    const total = per * qty
+    const story = ctx.rng.int(0, 3)
+    if (story === 0) {
+      return ask(ctx, L(`Pico flies ${n(total).en} km in ${n(qty).en} hours. What is the speed in km per hour?`, `Pico fliegt ${n(total).de} km in ${n(qty).de} Stunden. Wie viele km pro Stunde sind das?`, `Pico vuela ${n(total).es} km en ${n(qty).es} horas. ¿Cuál es la velocidad en km por hora?`), { type: 'number' }, { kind: 'number', value: per }, [
+        L('Divide distance by time.', 'Teile Strecke durch Zeit.', 'Divide la distancia entre el tiempo.'),
+        L(`${n(total).en} ÷ ${n(qty).en} = ${n(per).en}.`, `${n(total).de} ÷ ${n(qty).de} = ${n(per).de}.`, `${n(total).es} ÷ ${n(qty).es} = ${n(per).es}.`),
+      ], scene('sky'))
+    }
+    if (story === 1) {
+      return ask(ctx, L(`A boat sails ${n(total).en} km in ${n(qty).en} hours. How many km does it sail per hour?`, `Ein Boot fährt ${n(total).de} km in ${n(qty).de} Stunden. Wie viele km schafft es pro Stunde?`, `Un barco navega ${n(total).es} km en ${n(qty).es} horas. ¿Cuántos km avanza por hora?`), { type: 'number' }, { kind: 'number', value: per }, [
+        L('Divide total distance by the number of hours.', 'Teile die Gesamtstrecke durch die Stunden.', 'Divide la distancia total entre las horas.'),
+        L(`${n(total).en} ÷ ${n(qty).en} = ${n(per).en}.`, `${n(total).de} ÷ ${n(qty).de} = ${n(per).de}.`, `${n(total).es} ÷ ${n(qty).es} = ${n(per).es}.`),
+      ], scene('bay'))
+    }
+    if (story === 2) {
+      return ask(ctx, L(`A baker packs ${n(total).en} rolls into ${n(qty).en} equal bags. How many rolls per bag?`, `Eine Bäckerei packt ${n(total).de} Brötchen gleichmäßig in ${n(qty).de} Tüten. Wie viele Brötchen sind in einer Tüte?`, `Una panadería empaca ${n(total).es} panes en ${n(qty).es} bolsas iguales. ¿Cuántos panes van en cada bolsa?`), { type: 'number' }, { kind: 'number', value: per }, [
+        L('Divide the total rolls by the number of bags.', 'Teile alle Brötchen durch die Anzahl der Tüten.', 'Divide el total de panes entre el número de bolsas.'),
+        L(`${n(total).en} ÷ ${n(qty).en} = ${n(per).en}.`, `${n(total).de} ÷ ${n(qty).de} = ${n(per).de}.`, `${n(total).es} ÷ ${n(qty).es} = ${n(per).es}.`),
+      ], scene('kitchen'))
+    }
+    return ask(ctx, L(`${n(qty).en} crates hold ${n(total).en} apples in total. How many apples are in 1 crate?`, `In ${n(qty).de} Kisten sind insgesamt ${n(total).de} Äpfel. Wie viele Äpfel sind in 1 Kiste?`, `En ${n(qty).es} cajas hay ${n(total).es} manzanas en total. ¿Cuántas manzanas hay en 1 caja?`), { type: 'number' }, { kind: 'number', value: per }, [
+      L('Divide the total apples by the number of crates.', 'Teile alle Äpfel durch die Anzahl der Kisten.', 'Divide el total de manzanas entre las cajas.'),
+      L(`${n(total).en} ÷ ${n(qty).en} = ${n(per).en}.`, `${n(total).de} ÷ ${n(qty).de} = ${n(per).de}.`, `${n(total).es} ÷ ${n(qty).es} = ${n(per).es}.`),
+    ], scene('market'))
   }
   if (ctx.mode === 'percent') {
     const percentCap = Math.max(10, knobNum(ctx, 'whole', 50))
@@ -107,11 +127,18 @@ export function g6nsC(ctx: Ctx) {
     ])
   }
   if (ctx.mode === 'plot') {
-    const x = ctx.rng.int(-span, span)
-    const y = ctx.rng.int(-span, span)
-    const edge = span + 1
-    return ask(ctx, L(`Plot (${n(x).en}, ${n(y).en}).`, `Setze (${n(x).de}, ${n(y).de}).`, `Marca (${n(x).es}, ${n(y).es}).`), { type: 'coordinate', xMin: -edge, xMax: edge, yMin: -edge, yMax: edge }, { kind: 'points', points: [{ x, y }] }, [
-      L('Negative x goes left. Negative y goes down.', 'Negatives x geht nach links. Negatives y geht nach unten.', 'Una x negativa va a la izquierda. Una y negativa va hacia abajo.'),
+    const plotSpan = Math.min(span, 10)
+    const x = ctx.rng.int(-plotSpan, plotSpan)
+    const y = ctx.rng.int(-plotSpan, plotSpan)
+    const edge = plotSpan + 1
+    const xDirEn = x < 0 ? `${n(-x).en} left` : x > 0 ? `${n(x).en} right` : 'stay at 0'
+    const yDirEn = y < 0 ? `${n(-y).en} down` : y > 0 ? `${n(y).en} up` : 'stay at 0'
+    const xDirDe = x < 0 ? `${n(-x).de} nach links` : x > 0 ? `${n(x).de} nach rechts` : 'bei 0 bleiben'
+    const yDirDe = y < 0 ? `${n(-y).de} nach unten` : y > 0 ? `${n(y).de} nach oben` : 'bei 0 bleiben'
+    const xDirEs = x < 0 ? `${n(-x).es} a la izquierda` : x > 0 ? `${n(x).es} a la derecha` : 'quédate en 0'
+    const yDirEs = y < 0 ? `${n(-y).es} hacia abajo` : y > 0 ? `${n(y).es} hacia arriba` : 'quédate en 0'
+    return ask(ctx, L(`Plot (${n(x).en}, ${n(y).en}).`, `Setze den Punkt (${n(x).de}, ${n(y).de}).`, `Marca (${n(x).es}, ${n(y).es}).`), { type: 'coordinate', xMin: -edge, xMax: edge, yMin: -edge, yMax: edge }, { kind: 'points', points: [{ x, y }] }, [
+      L(`Start at (0, 0): go ${xDirEn}, then ${yDirEn}.`, `Starte bei (0, 0): gehe ${xDirDe}, dann ${yDirDe}.`, `Empieza en (0, 0): ve ${xDirEs}, luego ${yDirEs}.`),
       L(`The point is (${n(x).en}, ${n(y).en}).`, `Der Punkt ist (${n(x).de}, ${n(y).de}).`, `El punto es (${n(x).es}, ${n(y).es}).`),
     ])
   }

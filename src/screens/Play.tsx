@@ -15,6 +15,9 @@ import { AnswerFace, StimulusView } from '../components/visuals'
 import { MathText } from '../components/MathText'
 import { Mascot } from '../components/Mascot'
 import { Icon } from '../components/Icon'
+import { Scratchpad } from '../components/Scratchpad'
+
+type Tally = { correct: number; total: number; streak: number }
 
 const PRAISE = ['fb.exact', 'fb.clean', 'fb.spiral']
 const COMPACT_ANSWER = new Set(['number', 'fraction', 'choice', 'compare', 'points', 'ratio', 'digits', 'multi'])
@@ -39,22 +42,73 @@ export function Play() {
 }
 
 function Queue({ queue }: { queue: BlueprintItem[] }) {
+  const { locale, setRoute } = useStore()
   const [index, setIndex] = useState(0)
-  const item = queue[index % queue.length]
+  const [tally, setTally] = useState<Tally>({ correct: 0, total: 0, streak: 0 })
+  const [runId, setRunId] = useState(0)
+
+  if (index >= queue.length) {
+    const pct = tally.total ? Math.round((tally.correct / tally.total) * 100) : 100
+    return (
+      <div className="rise">
+        <Mascot mood={pct >= 70 ? 'joy' : 'think'} size={84} />
+        <p className="kicker">{t(locale, 'nav.practice')}</p>
+        <h1>{t(locale, 'play.queue.done')}</h1>
+        <p className="muted">{t(locale, 'play.session', { c: tally.correct, n: tally.total })} ({pct}%)</p>
+        <div className="row" style={{ marginTop: 14 }}>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => {
+              setIndex(0)
+              setTally({ correct: 0, total: 0, streak: 0 })
+              setRunId((v) => v + 1)
+            }}
+          >
+            {t(locale, 'play.queue.again')}
+          </button>
+          <button type="button" className="ghost" onClick={() => setRoute({ name: 'practice' })}>
+            {t(locale, 'play.backlist')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const item = queue[index]
   const skill = item ? getSkill(item.skillId) : undefined
   if (!item || !skill) return null
   return (
     <Session
-      key={`${index}-${item.skillId}-${unitVariant(skill, item.knobs)}`}
+      key={`${runId}-${index}-${item.skillId}-${unitVariant(skill, item.knobs)}`}
       skill={skill}
       startDifficulty={item.difficulty}
       fixedKnobs={item.knobs}
+      sharedTally={tally}
+      onTallyChange={setTally}
+      queueProgress={{ current: index + 1, total: queue.length }}
       onAdvance={() => setIndex((value) => value + 1)}
     />
   )
 }
 
-function Session({ skill, startDifficulty, fixedKnobs, onAdvance }: { skill: Skill; startDifficulty: number; fixedKnobs?: KnobValues; onAdvance?: () => void }) {
+function Session({
+  skill,
+  startDifficulty,
+  fixedKnobs,
+  onAdvance,
+  sharedTally,
+  onTallyChange,
+  queueProgress,
+}: {
+  skill: Skill
+  startDifficulty: number
+  fixedKnobs?: KnobValues
+  onAdvance?: () => void
+  sharedTally?: Tally
+  onTallyChange?: (updater: (current: Tally) => Tally) => void
+  queueProgress?: { current: number; total: number }
+}) {
   const { locale, data, logAttempt, flash, setRoute } = useStore()
   const profile = data.profile!
   const opening = fixedKnobs ?? defaultKnobs(skill, startDifficulty)
@@ -67,7 +121,9 @@ function Session({ skill, startDifficulty, fixedKnobs, onAdvance }: { skill: Ski
   const [hinted, setHinted] = useState(false)
   const [stepsOpen, setStepsOpen] = useState(false)
   const [began, setBegan] = useState(() => Date.now())
-  const [tally, setTally] = useState({ correct: 0, total: 0, streak: 0 })
+  const [localTally, setLocalTally] = useState<Tally>({ correct: 0, total: 0, streak: 0 })
+  const tally = sharedTally ?? localTally
+  const updateTally = onTallyChange ?? setLocalTally
   const zone = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const stepsRef = useRef<HTMLOListElement>(null)
@@ -101,7 +157,7 @@ function Session({ skill, startDifficulty, fixedKnobs, onAdvance }: { skill: Ski
     if (!ok && misses === 0) {
       setMisses(1)
       setHinted(false)
-      setTally((current) => ({ correct: current.correct, total: current.total + 1, streak: 0 }))
+      updateTally((current) => ({ correct: current.correct, total: current.total + 1, streak: 0 }))
       logAttempt({
         skillId: skill.id,
         correct: false,
@@ -118,7 +174,7 @@ function Session({ skill, startDifficulty, fixedKnobs, onAdvance }: { skill: Ski
     setResult(grade)
     setStepsOpen(false)
     if (misses === 0) {
-      setTally((current) => ({
+      updateTally((current) => ({
         correct: current.correct + (ok ? 1 : 0),
         total: current.total + 1,
         streak: ok ? current.streak + 1 : 0,
@@ -133,6 +189,11 @@ function Session({ skill, startDifficulty, fixedKnobs, onAdvance }: { skill: Ski
         result: grade,
         ...attemptDetail(question, answer, grade, locale),
       })
+    } else if (ok) {
+      updateTally((current) => ({
+        ...current,
+        correct: current.correct + 1,
+      }))
     }
     playFeedback(ok, profile.sound)
   }
@@ -184,7 +245,10 @@ function Session({ skill, startDifficulty, fixedKnobs, onAdvance }: { skill: Ski
     <div className="session">
       <div className="play-bar">
         <div className="row play-head">
-          <span className="kicker">{skill.code}{title ? ` · ${tx(locale, title)}` : ''} · {t(locale, settingsKey(skill, question.difficulty, knobs, squareIds(skill)))}</span>
+          <span className="kicker">
+            {queueProgress ? `${t(locale, 'play.queue.progress', { n: queueProgress.current, m: queueProgress.total })} · ` : ''}
+            {title ? tx(locale, title) : tx(locale, skill.title)} · {t(locale, settingsKey(skill, question.difficulty, knobs, squareIds(skill)))}
+          </span>
           <span className="play-meter">
             {tally.streak >= 2 ? <span className="streak-pill"><Icon name="spark" size={14} />{t(locale, 'play.streak', { n: tally.streak })}</span> : null}
             <span className="fine">{t(locale, 'play.session', { c: tally.correct, n: tally.total })}</span>
@@ -241,6 +305,7 @@ function Session({ skill, startDifficulty, fixedKnobs, onAdvance }: { skill: Ski
           <div ref={zone} className="answer-zone">
             <AnswerWidget key={question.id} response={question.response} locale={locale} locked={Boolean(result)} initial={answer} onChange={setAnswer} reveal={result ? question.answer : null} />
           </div>
+          {!result ? <Scratchpad locale={locale} resetKey={question.id} /> : null}
           {result && !compactAnswer ? answerFace : null}
           {stepsOpen ? (
             <ol className="steps" ref={stepsRef}>

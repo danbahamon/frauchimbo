@@ -48,14 +48,14 @@ export function Onboarding() {
         </>
       ) : null}
       {step === 1 ? (
-        <>
+        <form onSubmit={(event) => { event.preventDefault(); if (name.trim()) setStep(2) }}>
           <h1>{t(locale, 'on.name')}</h1>
           <input className="field" value={name} placeholder={t(locale, 'on.name.ph')} onChange={(event) => setName(event.target.value)} autoFocus />
           <div className="row" style={{ marginTop: 12 }}>
             <button type="button" className="ghost" onClick={() => setStep(0)}>{t(locale, 'on.back')}</button>
-            <button type="button" className="primary" disabled={!name.trim()} onClick={() => setStep(2)}>{t(locale, 'on.next')}</button>
+            <button type="submit" className="primary" disabled={!name.trim()}>{t(locale, 'on.next')}</button>
           </div>
-        </>
+        </form>
       ) : null}
       {step === 2 ? (
         <>
