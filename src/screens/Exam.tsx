@@ -773,7 +773,7 @@ function Choose() {
   const wrong = test.correct.filter((item) => !item).length
   return (
     <div>
-      <Mascot mood={wrong ? 'think' : 'joy'} size={140} />
+      <Mascot mood={wrong ? 'think' : 'joy'} size={84} />
       <p className="kicker">{tx(locale, test.blueprint.title) || t(locale, 'home.test')}</p>
       <h1>{t(locale, 'choose.title')}</h1>
       <p className="muted">{t(locale, 'choose.sub')}</p>
@@ -798,7 +798,7 @@ function Investigate() {
   if (!misses.length) {
     return (
       <div>
-        <Mascot mood="joy" size={120} />
+        <Mascot mood="joy" size={80} />
         <h1>{t(locale, 'inv.none')}</h1>
         <button type="button" className="primary" onClick={() => { patchTest(test.id, { investigate: { spotted: 0, total: 0 } }); setRoute({ name: 'summary', id: test.id }) }}>{t(locale, 'inv.summary')}</button>
       </div>
@@ -987,7 +987,7 @@ function Shared() {
   }
   return (
     <div>
-      <Mascot mood="joy" size={130} />
+      <Mascot mood="joy" size={80} />
       <p className="kicker">{t(locale, 'shared.title')}</p>
       <h1>{tx(locale, blueprint.title) || t(locale, 'home.test')}</h1>
       <p className="muted">{t(locale, 'share.note')}</p>

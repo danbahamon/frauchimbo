@@ -54,6 +54,7 @@ function Delta({ now, before, points = false }: { now: number | null; before: nu
 export function Stats() {
   const { locale, data, setRoute, requestStatsPrint } = useStore()
   const profile = data.profile
+  const [tab, setTab] = useState<'overview' | 'skills' | 'history'>('overview')
   const [range, setRange] = useState<RangeDays>(30)
   const [domain, setDomain] = useState<DomainId | 'all'>('all')
   const [shown, setShown] = useState(PAGE)
@@ -102,6 +103,13 @@ export function Stats() {
       </div>
 
       <div className="st-toolbar">
+        <div className="segment" role="tablist" aria-label={t(locale, 'stats.report')}>
+          {(['overview', 'skills', 'history'] as const).map((view) => (
+            <button key={view} type="button" role="tab" aria-selected={tab === view} data-on={tab === view} onClick={() => setTab(view)}>
+              {t(locale, `stats.tab.${view}`)}
+            </button>
+          ))}
+        </div>
         <div className="segment" role="radiogroup" aria-label={t(locale, 'stats.range')}>
           {RANGES.map((option) => (
             <button key={option} type="button" role="radio" aria-checked={range === option} data-on={range === option} onClick={() => { setRange(option); setShown(PAGE) }}>
@@ -109,7 +117,9 @@ export function Stats() {
             </button>
           ))}
         </div>
-        <div className="row" role="radiogroup" aria-label={t(locale, 'stats.subjects')}>
+      </div>
+      {presentDomains.length > 1 ? (
+        <div className="row" style={{ marginBottom: 12 }} role="radiogroup" aria-label={t(locale, 'stats.subjects')}>
           <button type="button" className="chip" role="radio" aria-checked={domain === 'all'} data-on={domain === 'all'} onClick={() => setDomain('all')}>{t(locale, 'stats.subject.all')}</button>
           {presentDomains.map((item) => (
             <button key={item} type="button" className="chip" role="radio" aria-checked={domain === item} data-on={domain === item} onClick={() => setDomain(item)}>
@@ -117,7 +127,7 @@ export function Stats() {
             </button>
           ))}
         </div>
-      </div>
+      ) : null}
 
       <div className="st-kpis">
         <article className="card st-kpi">
@@ -145,150 +155,167 @@ export function Stats() {
         </article>
       </div>
 
-      <section className="card pad st-card">
-        <div className="st-head">
-          <h2>{t(locale, 'stats.practice.title')}</h2>
-          <div className="st-legend">
-            <span><i className="st-key correct" /> {t(locale, 'stats.legend.correct')}</span>
-            <span><i className="st-key wrong" /> {t(locale, 'stats.legend.missed')}</span>
-          </div>
-        </div>
-        <p className="fine">{t(locale, 'stats.practice.sub', { unit })}</p>
-        {current.length ? (
-          <div className="st-scroll">
-            <svg className="st-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t(locale, 'stats.practice.title')}>
-              <PracticeBars series={series} max={Math.max(1, ...series.map((bucket) => bucket.total))} />
-              <XLabels series={series} label={rangeLabel} />
-            </svg>
-          </div>
-        ) : <p className="muted">{t(locale, 'stats.noData')}</p>}
-      </section>
-
-      <section className="card pad st-card">
-        <div className="st-head">
-          <h2>{t(locale, 'stats.accuracy.title')}</h2>
-        </div>
-        {series.some((bucket) => bucket.accuracy !== null) ? (
-          <div className="st-scroll">
-            <svg className="st-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t(locale, 'stats.accuracy.title')}>
-              <AccuracyLine series={series} />
-              <XLabels series={series} label={rangeLabel} />
-            </svg>
-          </div>
-        ) : <p className="muted">{t(locale, 'stats.noData')}</p>}
-      </section>
-
-      <div className="st-grid2">
-        <section className="card pad st-card">
-          <h2>{t(locale, 'stats.mistakes')}</h2>
-          {mistakes.kinds.length ? (
-            <div className="st-bars">
-              {mistakes.kinds.map((item, index) => (
-                <div key={item.kind} className="st-hrow" style={{ ['--i' as string]: index }}>
-                  <span>{t(locale, `miss.${item.kind}`)}</span>
-                  <div className="st-htrack"><i style={{ width: `${(item.count / worstMiss) * 100}%` }} /></div>
-                  <b>{item.count}</b>
+      {tab === 'overview' ? (
+        <>
+          <div className="st-grid2">
+            <section className="card pad st-card">
+              <div className="st-head">
+                <h2>{t(locale, 'stats.practice.title')}</h2>
+                <div className="st-legend">
+                  <span><i className="st-key correct" /> {t(locale, 'stats.legend.correct')}</span>
+                  <span><i className="st-key wrong" /> {t(locale, 'stats.legend.missed')}</span>
                 </div>
-              ))}
-            </div>
-          ) : <p className="muted">{t(locale, 'stats.mistakes.none')}</p>}
-          {mistakes.unrecorded ? <p className="fine">{t(locale, 'stats.mistakes.unrecorded', { n: mistakes.unrecorded })}</p> : null}
-        </section>
+              </div>
+              <p className="fine">{t(locale, 'stats.practice.sub', { unit })}</p>
+              {current.length ? (
+                <div className="st-scroll">
+                  <svg className="st-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t(locale, 'stats.practice.title')}>
+                    <PracticeBars series={series} max={Math.max(1, ...series.map((bucket) => bucket.total))} />
+                    <XLabels series={series} label={rangeLabel} />
+                  </svg>
+                </div>
+              ) : <p className="muted">{t(locale, 'stats.noData')}</p>}
+            </section>
 
-        <section className="card pad st-card">
-          <h2>{t(locale, 'stats.subjects')}</h2>
-          {subjects.length ? (
-            <div className="st-subjects">
-              {subjects.map((row) => (
-                <button key={row.domain} type="button" className="st-subject" onClick={() => setDomain(row.domain)} data-on={domain === row.domain}>
-                  <i className="dot" style={{ background: DOMAIN_COLOR[row.domain] }} />
-                  <span>{t(locale, `domain.${row.domain}`)}</span>
-                  <Spark series={row.series} color={DOMAIN_COLOR[row.domain]} />
-                  <b>{percent(row.accuracy)}</b>
-                  <Delta now={row.accuracy} before={row.previous} points />
-                </button>
-              ))}
-            </div>
-          ) : <p className="muted">{t(locale, 'stats.noData')}</p>}
-        </section>
-      </div>
-
-      <div className="split" style={{ marginTop: 14 }}>
-        <section className="card pad st-card">
-          <h2>{t(locale, 'stats.strengths')}</h2>
-          <SkillList rows={strengths} empty={t(locale, 'stats.none')} locale={locale} onOpen={(skillId) => setRoute({ name: 'play', skillId, auto: true, difficulty: 5 })} />
-        </section>
-        <section className="card pad st-card">
-          <h2>{t(locale, 'stats.growth')}</h2>
-          <SkillList rows={growth} empty={t(locale, 'stats.none')} locale={locale} onOpen={(skillId) => setRoute({ name: 'play', skillId, auto: true, difficulty: 2 })} />
-        </section>
-      </div>
-
-      <section className="card pad st-card" style={{ marginTop: 14 }}>
-        <h2>{t(locale, 'stats.skills')}</h2>
-        {skills.length ? (
-          <div className="st-table">
-            <div className="st-tr st-th">
-              <span>{t(locale, 'stats.col.skill')}</span>
-              <span>{t(locale, 'stats.col.questions')}</span>
-              <span>{t(locale, 'stats.accuracy')}</span>
-              <span>{t(locale, 'stats.col.change')}</span>
-              <span>{t(locale, 'stats.col.last')}</span>
-            </div>
-            {skills.map((row) => <SkillLine key={row.skillId} row={row} locale={locale} onOpen={() => setRoute({ name: 'play', skillId: row.skillId, auto: true, difficulty: 3 })} />)}
+            <section className="card pad st-card">
+              <div className="st-head">
+                <h2>{t(locale, 'stats.accuracy.title')}</h2>
+              </div>
+              {series.some((bucket) => bucket.accuracy !== null) ? (
+                <div className="st-scroll">
+                  <svg className="st-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t(locale, 'stats.accuracy.title')}>
+                    <AccuracyLine series={series} />
+                    <XLabels series={series} label={rangeLabel} />
+                  </svg>
+                </div>
+              ) : <p className="muted">{t(locale, 'stats.noData')}</p>}
+            </section>
           </div>
-        ) : <p className="muted">{t(locale, 'stats.noData')}</p>}
-      </section>
 
-      {ideas.length ? (
-        <section style={{ marginTop: 14 }}>
-          <h2>{t(locale, 'stats.next')}</h2>
-          <div className="catalog">
-            {ideas.map((idea) => {
-              const skill = getSkill(idea.skillId)
-              if (!skill) return null
-              return (
-                <button key={idea.skillId + idea.reason} type="button" className="skill-card" style={{ ['--wash' as string]: DOMAIN_COLOR[skill.domain] }} onClick={() => setRoute({ name: 'play', skillId: skill.id, auto: true, difficulty: idea.difficulty })}>
-                  <small>{t(locale, `reason.${idea.reason}`)}</small>
-                  <b>{tx(locale, skill.title)}</b>
-                  <span>{t(locale, levelKey(idea.difficulty))}</span>
-                </button>
-              )
-            })}
-          </div>
-        </section>
+          {ideas.length ? (
+            <section style={{ marginTop: 12 }}>
+              <h2>{t(locale, 'stats.next')}</h2>
+              <div className="catalog">
+                {ideas.map((idea) => {
+                  const skill = getSkill(idea.skillId)
+                  if (!skill) return null
+                  return (
+                    <button key={idea.skillId + idea.reason} type="button" className="skill-card unit-card" style={{ ['--wash' as string]: DOMAIN_COLOR[skill.domain] }} onClick={() => setRoute({ name: 'play', skillId: skill.id, auto: true, difficulty: idea.difficulty })}>
+                      <small>{t(locale, `reason.${idea.reason}`)}</small>
+                      <b>{tx(locale, skill.title)}</b>
+                      <span>{t(locale, levelKey(idea.difficulty))}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+          ) : null}
+        </>
       ) : null}
 
-      <section className="card pad st-card" style={{ marginTop: 14 }}>
-        <div className="st-head">
-          <h2>{t(locale, 'stats.seen.title')}</h2>
-          <small className="fine">{t(locale, 'stats.seen.count', { shown: Math.min(shown, seen.length), total: seen.length })}</small>
-        </div>
-        {seen.length ? (
-          <div className="st-seen">
-            {seen.slice(0, shown).map((item) => <SeenRow key={item.id} item={item} locale={locale} />)}
-            {shown < seen.length ? (
-              <button type="button" className="ghost" onClick={() => setShown((count) => count + PAGE)}>{t(locale, 'stats.seen.more')}</button>
-            ) : null}
-          </div>
-        ) : <p className="muted">{t(locale, 'stats.seen.none')}</p>}
-      </section>
+      {tab === 'skills' ? (
+        <>
+          <div className="st-grid2">
+            <section className="card pad st-card">
+              <h2>{t(locale, 'stats.mistakes')}</h2>
+              {mistakes.kinds.length ? (
+                <div className="st-bars">
+                  {mistakes.kinds.map((item, index) => (
+                    <div key={item.kind} className="st-hrow" style={{ ['--i' as string]: index }}>
+                      <span>{t(locale, `miss.${item.kind}`)}</span>
+                      <div className="st-htrack"><i style={{ width: `${(item.count / worstMiss) * 100}%` }} /></div>
+                      <b>{item.count}</b>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="muted">{t(locale, 'stats.mistakes.none')}</p>}
+              {mistakes.unrecorded ? <p className="fine">{t(locale, 'stats.mistakes.unrecorded', { n: mistakes.unrecorded })}</p> : null}
+            </section>
 
-      <h2 style={{ marginTop: 16 }}>{t(locale, 'stats.tests')}</h2>
-      {tests.length === 0 ? <p className="muted">{t(locale, 'stats.none')}</p> : null}
-      <div className="stack">
-        {[...tests].reverse().slice(0, 6).map((test) => {
-          const scored = test.correct.filter(Boolean).length
-          return (
-            <button key={test.id} type="button" className="sum-row" onClick={() => setRoute({ name: 'summary', id: test.id })}>
-              <span>{scored}/{test.questions.length}</span>
-              <span>{tx(locale, test.blueprint.title) || t(locale, 'home.test')}</span>
-              <small>{new Date(test.finishedAt).toLocaleDateString(localeTag(locale))}</small>
-              <small>{clock(test.times.reduce((sum, item) => sum + item, 0))}</small>
-            </button>
-          )
-        })}
-      </div>
+            <section className="card pad st-card">
+              <h2>{t(locale, 'stats.subjects')}</h2>
+              {subjects.length ? (
+                <div className="st-subjects">
+                  {subjects.map((row) => (
+                    <button key={row.domain} type="button" className="st-subject" onClick={() => setDomain(row.domain)} data-on={domain === row.domain}>
+                      <i className="dot" style={{ background: DOMAIN_COLOR[row.domain] }} />
+                      <span>{t(locale, `domain.${row.domain}`)}</span>
+                      <Spark series={row.series} color={DOMAIN_COLOR[row.domain]} />
+                      <b>{percent(row.accuracy)}</b>
+                      <Delta now={row.accuracy} before={row.previous} points />
+                    </button>
+                  ))}
+                </div>
+              ) : <p className="muted">{t(locale, 'stats.noData')}</p>}
+            </section>
+          </div>
+
+          <div className="split" style={{ marginTop: 12 }}>
+            <section className="card pad st-card">
+              <h2>{t(locale, 'stats.strengths')}</h2>
+              <SkillList rows={strengths} empty={t(locale, 'stats.none')} locale={locale} onOpen={(skillId) => setRoute({ name: 'play', skillId, auto: true, difficulty: 5 })} />
+            </section>
+            <section className="card pad st-card">
+              <h2>{t(locale, 'stats.growth')}</h2>
+              <SkillList rows={growth} empty={t(locale, 'stats.none')} locale={locale} onOpen={(skillId) => setRoute({ name: 'play', skillId, auto: true, difficulty: 2 })} />
+            </section>
+          </div>
+
+          <section className="card pad st-card" style={{ marginTop: 12 }}>
+            <h2>{t(locale, 'stats.skills')}</h2>
+            {skills.length ? (
+              <div className="st-table">
+                <div className="st-tr st-th">
+                  <span>{t(locale, 'stats.col.skill')}</span>
+                  <span>{t(locale, 'stats.col.questions')}</span>
+                  <span>{t(locale, 'stats.accuracy')}</span>
+                  <span>{t(locale, 'stats.col.change')}</span>
+                  <span>{t(locale, 'stats.col.last')}</span>
+                </div>
+                {skills.map((row) => <SkillLine key={row.skillId} row={row} locale={locale} onOpen={() => setRoute({ name: 'play', skillId: row.skillId, auto: true, difficulty: 3 })} />)}
+              </div>
+            ) : <p className="muted">{t(locale, 'stats.noData')}</p>}
+          </section>
+        </>
+      ) : null}
+
+      {tab === 'history' ? (
+        <>
+          <section className="card pad st-card">
+            <h2>{t(locale, 'stats.tests')}</h2>
+            {tests.length === 0 ? <p className="muted">{t(locale, 'stats.none')}</p> : (
+              <div className="stack">
+                {[...tests].reverse().slice(0, 10).map((test) => {
+                  const scored = test.correct.filter(Boolean).length
+                  return (
+                    <button key={test.id} type="button" className="sum-row" onClick={() => setRoute({ name: 'summary', id: test.id })}>
+                      <span>{scored}/{test.questions.length}</span>
+                      <span>{tx(locale, test.blueprint.title) || t(locale, 'home.test')}</span>
+                      <small>{new Date(test.finishedAt).toLocaleDateString(localeTag(locale))}</small>
+                      <small>{clock(test.times.reduce((sum, item) => sum + item, 0))}</small>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="card pad st-card" style={{ marginTop: 12 }}>
+            <div className="st-head">
+              <h2>{t(locale, 'stats.seen.title')}</h2>
+              <small className="fine">{t(locale, 'stats.seen.count', { shown: Math.min(shown, seen.length), total: seen.length })}</small>
+            </div>
+            {seen.length ? (
+              <div className="st-seen">
+                {seen.slice(0, shown).map((item) => <SeenRow key={item.id} item={item} locale={locale} />)}
+                {shown < seen.length ? (
+                  <button type="button" className="ghost" onClick={() => setShown((count) => count + PAGE)}>{t(locale, 'stats.seen.more')}</button>
+                ) : null}
+              </div>
+            ) : <p className="muted">{t(locale, 'stats.seen.none')}</p>}
+          </section>
+        </>
+      ) : null}
     </div>
   )
 }

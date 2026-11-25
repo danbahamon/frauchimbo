@@ -113,6 +113,7 @@ export function WorkoutStats() {
   const attempts = data.attempts
   const pins = data.pins ?? []
   const snapshot = useMemo(() => workoutSnapshot(attempts, pins), [attempts, pins])
+  const [view, setView] = useState<'activity' | 'trend'>('activity')
   const [focus, setFocus] = useState<number | null>(null)
   const [override, setOverride] = useState<Record<string, boolean>>({})
   const selected = focus ?? snapshot.today
@@ -138,99 +139,112 @@ export function WorkoutStats() {
 
   return (
     <div className="wk">
-      <section className="card pad wk-card" aria-labelledby="wk-board">
-        <div className="wk-head">
-          <div>
-            <h2 id="wk-board">{t(locale, 'work.board')}</h2>
-            <p className="fine">{t(locale, 'work.cal.sub')}</p>
-          </div>
+      <div className="wk-head" style={{ marginBottom: 10 }}>
+        <div className="segment" role="tablist" aria-label={t(locale, 'work.board')}>
+          <button type="button" role="tab" aria-selected={view === 'activity'} data-on={view === 'activity'} onClick={() => setView('activity')}>
+            {t(locale, 'work.tab.activity')}
+          </button>
+          <button type="button" role="tab" aria-selected={view === 'trend'} data-on={view === 'trend'} onClick={() => setView('trend')}>
+            {t(locale, 'work.tab.trend')}
+          </button>
         </div>
-        <div className="wk-kpis">
-          <article className="wk-kpi" data-tone="teal">
-            <small>{t(locale, 'work.stat.days')}</small>
-            <b>{snapshot.activeDays}</b>
-            <span>{t(locale, 'work.stat.days.of', { n: snapshot.span })}</span>
-          </article>
-          <article className="wk-kpi" data-tone="indigo">
-            <small>{t(locale, 'work.stat.questions')}</small>
-            <b>{snapshot.questions}</b>
-            <span>{share == null ? '–' : t(locale, 'work.stat.rate', { n: share })}</span>
-          </article>
-          <article className="wk-kpi" data-tone="teal">
-            <small>{t(locale, 'work.stat.correct')}</small>
-            <b>{snapshot.correct}</b>
-            <span>{snapshot.questions ? t(locale, 'work.stat.of', { n: snapshot.questions }) : '–'}</span>
-          </article>
-          <article className="wk-kpi" data-tone="coral">
-            <small>{t(locale, 'work.stat.wrong')}</small>
-            <b>{snapshot.wrong}</b>
-            <span>{redShare == null ? '–' : t(locale, 'work.stat.share', { n: redShare })}</span>
-          </article>
-          <article className="wk-kpi" data-tone="gold">
-            <small>{t(locale, 'work.stat.time')}</small>
-            <b>{spent.big}</b>
-            <span>{t(locale, spent.unit === 'hour' ? 'work.time.unit.hour' : 'work.time.unit.min')}</span>
-          </article>
-        </div>
-        <div className="wk-cal-row">
-          <div className="wk-cal-wrap">
-            <div className="wk-cal" style={{ ['--weeks' as string]: snapshot.weeks.length }} role="group" aria-label={t(locale, 'work.cal.aria')}>
-              <span className="wk-corner" />
-              {snapshot.weeks.map((week) => (
-                <span key={`m-${week.days[0].day}`} className="wk-month" aria-hidden="true">
-                  {week.labelDay == null ? '' : formatMonth(week.labelDay, locale)}
-                </span>
-              ))}
-              {labels.map((label, dow) => (
-                <DowRow
-                  key={label + dow}
-                  label={label}
-                  dow={dow}
-                  weeks={snapshot.weeks}
-                  locale={locale}
-                  selected={selected}
-                  today={snapshot.today}
-                  onPick={setFocus}
-                />
-              ))}
-            </div>
-            <div className="wk-scale" aria-hidden="true">
-              <span>{t(locale, 'work.cal.less')}</span>
-              {[0, 1, 2, 3, 4].map((level) => <i key={level} className="wk-pip" data-level={level} />)}
-              <span>{t(locale, 'work.cal.more')}</span>
-            </div>
-          </div>
-          <div className="wk-day">
-            <small>{formatDay(selected, locale, true)}</small>
-            <strong className="wk-today">{selected === snapshot.today ? t(locale, 'work.today') : ''}</strong>
-            <b>{day.count}</b>
-            <span className="wk-day-label">{day.count ? t(locale, 'work.cal.count') : t(locale, 'work.cal.rest')}</span>
-            {day.count ? (
-              <>
-                <div className="wk-mix" aria-hidden="true">
-                  <i className="ok" style={{ width: `${(day.correct / day.count) * 100}%` }} />
-                  <i className="no" style={{ width: `${(day.wrong / day.count) * 100}%` }} />
-                </div>
-                <div className="wk-facts">
-                  <span><b>{day.correct}</b> {t(locale, 'work.stat.correct')}</span>
-                  <span><b>{day.wrong}</b> {t(locale, 'work.stat.wrong')}</span>
-                  <span><b>{clock(day.timeMs, locale)}</b></span>
-                </div>
-              </>
-            ) : null}
-          </div>
-        </div>
-      </section>
+      </div>
 
-      <Progress
-        locale={locale}
-        snapshot={snapshot}
-        selected={selected}
-        shown={shown}
-        onToggle={toggle}
-        onPick={setFocus}
-        heatNote={heatNote}
-      />
+      {view === 'activity' ? (
+        <section className="card pad wk-card" aria-labelledby="wk-board">
+          <div className="wk-head">
+            <div>
+              <h2 id="wk-board">{t(locale, 'work.board')}</h2>
+              <p className="fine">{t(locale, 'work.cal.sub')}</p>
+            </div>
+          </div>
+          <div className="wk-kpis">
+            <article className="wk-kpi" data-tone="teal">
+              <small>{t(locale, 'work.stat.days')}</small>
+              <b>{snapshot.activeDays}</b>
+              <span>{t(locale, 'work.stat.days.of', { n: snapshot.span })}</span>
+            </article>
+            <article className="wk-kpi" data-tone="indigo">
+              <small>{t(locale, 'work.stat.questions')}</small>
+              <b>{snapshot.questions}</b>
+              <span>{share == null ? '–' : t(locale, 'work.stat.rate', { n: share })}</span>
+            </article>
+            <article className="wk-kpi" data-tone="teal">
+              <small>{t(locale, 'work.stat.correct')}</small>
+              <b>{snapshot.correct}</b>
+              <span>{snapshot.questions ? t(locale, 'work.stat.of', { n: snapshot.questions }) : '–'}</span>
+            </article>
+            <article className="wk-kpi" data-tone="coral">
+              <small>{t(locale, 'work.stat.wrong')}</small>
+              <b>{snapshot.wrong}</b>
+              <span>{redShare == null ? '–' : t(locale, 'work.stat.share', { n: redShare })}</span>
+            </article>
+            <article className="wk-kpi" data-tone="gold">
+              <small>{t(locale, 'work.stat.time')}</small>
+              <b>{spent.big}</b>
+              <span>{t(locale, spent.unit === 'hour' ? 'work.time.unit.hour' : 'work.time.unit.min')}</span>
+            </article>
+          </div>
+          <div className="wk-cal-row">
+            <div className="wk-cal-wrap">
+              <div className="wk-cal" style={{ ['--weeks' as string]: snapshot.weeks.length }} role="group" aria-label={t(locale, 'work.cal.aria')}>
+                <span className="wk-corner" />
+                {snapshot.weeks.map((week) => (
+                  <span key={`m-${week.days[0].day}`} className="wk-month" aria-hidden="true">
+                    {week.labelDay == null ? '' : formatMonth(week.labelDay, locale)}
+                  </span>
+                ))}
+                {labels.map((label, dow) => (
+                  <DowRow
+                    key={label + dow}
+                    label={label}
+                    dow={dow}
+                    weeks={snapshot.weeks}
+                    locale={locale}
+                    selected={selected}
+                    today={snapshot.today}
+                    onPick={setFocus}
+                  />
+                ))}
+              </div>
+              <div className="wk-scale" aria-hidden="true">
+                <span>{t(locale, 'work.cal.less')}</span>
+                {[0, 1, 2, 3, 4].map((level) => <i key={level} className="wk-pip" data-level={level} />)}
+                <span>{t(locale, 'work.cal.more')}</span>
+              </div>
+            </div>
+            <div className="wk-day">
+              <small>{formatDay(selected, locale, true)}</small>
+              <strong className="wk-today">{selected === snapshot.today ? t(locale, 'work.today') : ''}</strong>
+              <b>{day.count}</b>
+              <span className="wk-day-label">{day.count ? t(locale, 'work.cal.count') : t(locale, 'work.cal.rest')}</span>
+              {day.count ? (
+                <>
+                  <div className="wk-mix" aria-hidden="true">
+                    <i className="ok" style={{ width: `${(day.correct / day.count) * 100}%` }} />
+                    <i className="no" style={{ width: `${(day.wrong / day.count) * 100}%` }} />
+                  </div>
+                  <div className="wk-facts">
+                    <span><b>{day.correct}</b> {t(locale, 'work.stat.correct')}</span>
+                    <span><b>{day.wrong}</b> {t(locale, 'work.stat.wrong')}</span>
+                    <span><b>{clock(day.timeMs, locale)}</b></span>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      ) : (
+        <Progress
+          locale={locale}
+          snapshot={snapshot}
+          selected={selected}
+          shown={shown}
+          onToggle={toggle}
+          onPick={setFocus}
+          heatNote={heatNote}
+        />
+      )}
     </div>
   )
 }

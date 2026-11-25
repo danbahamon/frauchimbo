@@ -8,20 +8,24 @@ import { ShadeBar } from './ShadeBar'
 import { ClockFace, PlaneGrid, ShapeFig, planeMap } from './visuals'
 
 function useKeys(onKey: (key: string) => void, enabled: boolean) {
+  const ref = useRef(onKey)
+  ref.current = onKey
   useEffect(() => {
     if (!enabled) return
     const listen = (event: KeyboardEvent) => {
       if (document.querySelector('[data-answer-lock]')) return
       const tag = (event.target as HTMLElement | null)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
-      if (event.key === 'Backspace') onKey('back')
-      else if (event.key === '-' || event.key === '±') onKey('sign')
-      else if (event.key === '.' || event.key === ',') onKey('dec')
-      else if (/^\d$/.test(event.key)) onKey(event.key)
+      if (event.key === 'Backspace') ref.current('back')
+      else if (event.key === '-' || event.key === '±') ref.current('sign')
+      else if (event.key === '.' || event.key === ',') ref.current('dec')
+      else if (event.key === '/' || event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') ref.current(event.key)
+      else if (event.key === '<' || event.key === '=' || event.key === '>') ref.current(event.key)
+      else if (/^\d$/.test(event.key)) ref.current(event.key)
     }
     window.addEventListener('keydown', listen)
     return () => window.removeEventListener('keydown', listen)
-  }, [enabled, onKey])
+  }, [enabled])
 }
 
 function Pad({ locale, allowDecimal, allowNegative, onKey }: { locale: Locale; allowDecimal?: boolean; allowNegative?: boolean; onKey: (key: string) => void }) {
@@ -94,11 +98,12 @@ export function AnswerWidget({ response, locale, onChange, initial, locked = fal
   )
 }
 
-function applyNumber(current: string, key: string) {
+function applyNumber(current: string, key: string, allowDecimal?: boolean, allowNegative?: boolean) {
   if (key === 'clear') return ''
   if (key === 'back') return current.slice(0, -1)
-  if (key === 'sign') return current.startsWith('-') ? current.slice(1) : `-${current}`
-  if (key === 'dec') return current.includes('.') ? current : `${current || '0'}.`
+  if (key === 'sign') return allowNegative ? (current.startsWith('-') ? current.slice(1) : `-${current}`) : current
+  if (key === 'dec') return !allowDecimal || current.includes('.') ? current : `${current || '0'}.`
+  if (!/^\d$/.test(key)) return current
   // Fifteen places is the longest whole number the games build, plus one digit when rounding climbs to the next place.
   if (current.replace('-', '').replace('.', '').length >= 16) return current
   return `${current}${key}`
@@ -107,10 +112,10 @@ function applyNumber(current: string, key: string) {
 function NumberWidget({ response, locale, onChange, initial }: { response: Extract<Response, { type: 'number' }>; locale: Locale; onChange: (answer: Answer | null) => void; initial: number | null }) {
   const [text, setText] = useState(initial == null ? '' : String(initial))
   const emit = useEmit(onChange)
-  const push = (key: string) => setText((current) => applyNumber(current, key))
+  const push = (key: string) => setText((current) => applyNumber(current, key, response.allowDecimal, response.allowNegative))
   useEffect(() => {
     const value = parseNumeric(text)
-    if (response.allowNegative === false && text.startsWith('-')) emit.current(null)
+    if (!response.allowNegative && text.startsWith('-')) emit.current(null)
     else emit.current(value == null ? null : { kind: 'number', value })
   }, [text, response.allowNegative, emit])
   useKeys(push, true)
@@ -149,12 +154,20 @@ function FractionWidget({ response, locale, onChange, initial }: { response: Ext
     emit.current({ kind: 'fraction', whole, n: numer, d })
   }, [parts, emit])
   const push = (key: string) => {
+    if (key === '/' || key === 'ArrowDown') {
+      setField((cur) => (cur === 'w' ? 'n' : 'd'))
+      return
+    }
+    if (key === 'ArrowUp') {
+      setField((cur) => (cur === 'd' ? 'n' : response.allowWhole ? 'w' : 'n'))
+      return
+    }
     setParts((current) => {
       const target = field === 'w' ? 'w' : field
-      if (key === 'sign') return { ...current, neg: !current.neg }
+      if (key === 'sign') return response.allowNegative ? { ...current, neg: !current.neg } : current
       if (key === 'clear') return { ...current, [target]: '' }
       if (key === 'back') return { ...current, [target]: current[target].slice(0, -1) }
-      if (key === 'dec' || current[target].length >= 3) return current
+      if (!/^\d$/.test(key) || current[target].length >= 5) return current
       return { ...current, [target]: `${current[target]}${key}` }
     })
   }
@@ -202,12 +215,19 @@ function ChoiceWidget({ response, locale, onChange, initial }: { response: Extra
 
 function CompareWidget({ response, locale, onChange, initial }: { response: Extract<Response, { type: 'compare' }>; locale: Locale; onChange: (answer: Answer | null) => void; initial: '<' | '=' | '>' | null }) {
   const [sign, setSign] = useState(initial)
+  const pick = (item: '<' | '=' | '>') => {
+    setSign(item)
+    onChange({ kind: 'compare', sign: item })
+  }
+  useKeys((key) => {
+    if (key === '<' || key === '=' || key === '>') pick(key)
+  }, true)
   return (
     <div>
       <div className="expr"><MathText text={tx(locale, response.left)} /><span>{sign ?? '?'}</span><MathText text={tx(locale, response.right)} /></div>
       <div className="signs">
         {(['<', '=', '>'] as const).map((item) => (
-          <button key={item} type="button" className="sign" data-on={sign === item} onClick={() => { setSign(item); onChange({ kind: 'compare', sign: item }) }}>{item}</button>
+          <button key={item} type="button" className="sign" data-on={sign === item} onClick={() => pick(item)}>{item}</button>
         ))}
       </div>
     </div>
@@ -234,8 +254,8 @@ function OrderWidget({ response, locale, onChange, initial }: { response: Extrac
         return (
           <div key={id} className="row">
             <div className="order-item" style={{ flex: 1 }}><MathText text={item ? tx(locale, item.label) : id} /></div>
-            <button type="button" className="icon-btn" onClick={() => move(index, -1)} aria-label="up">↑</button>
-            <button type="button" className="icon-btn" onClick={() => move(index, 1)} aria-label="down">↓</button>
+            <button type="button" className="icon-btn" disabled={index === 0} onClick={() => move(index, -1)} aria-label={t(locale, 'test.up')}>↑</button>
+            <button type="button" className="icon-btn" disabled={index === ids.length - 1} onClick={() => move(index, 1)} aria-label={t(locale, 'test.down')}>↓</button>
           </div>
         )
       })}
@@ -245,29 +265,54 @@ function OrderWidget({ response, locale, onChange, initial }: { response: Extrac
 
 function LineWidget({ response, locale, onChange, initial }: { response: Extract<Response, { type: 'numberline' }>; locale: Locale; onChange: (answer: Answer | null) => void; initial: number | null }) {
   const [value, setValue] = useState<number | null>(initial)
-  const setFrom = (clientX: number, svg: SVGSVGElement) => {
-    const rect = svg.getBoundingClientRect()
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
-    const raw = response.min + ratio * (response.max - response.min)
+  const span = response.max - response.min
+  const stepCount = response.step > 0 ? Math.round(span / response.step) : 0
+  const commit = (raw: number) => {
     const steps = Math.round((raw - response.min) / response.step)
     const snapped = Math.min(response.max, Math.max(response.min, response.min + steps * response.step))
     const clean = Number(snapped.toFixed(4))
     setValue(clean)
     onChange({ kind: 'number', value: clean })
   }
-  const x = value == null ? 20 : 20 + ((value - response.min) / (response.max - response.min)) * 280
+  const setFrom = (clientX: number, svg: SVGSVGElement) => {
+    const rect = svg.getBoundingClientRect()
+    const svgX = ((clientX - rect.left) / rect.width) * 320
+    const ratio = Math.min(1, Math.max(0, (svgX - 20) / 280))
+    commit(response.min + ratio * span)
+  }
+  useKeys((key) => {
+    if (key === 'ArrowLeft') commit((value ?? response.min) - response.step)
+    else if (key === 'ArrowRight') commit((value ?? response.min) + response.step)
+  }, true)
+  const formatVal = (v: number) => {
+    if (response.fraction && response.step > 0) {
+      const den = Math.round(1 / response.step)
+      const num = Math.round(v * den)
+      if (num === 0) return '0'
+      if (num === den) return '1'
+      return `${num}/${den}`
+    }
+    return Number.isInteger(v) ? formatNumber(locale, v) : formatNumber(locale, v)
+  }
+  const x = value == null ? 20 : 20 + ((value - response.min) / span) * 280
+  const ticks = stepCount > 0 && stepCount <= 24 ? Array.from({ length: stepCount + 1 }, (_, i) => i) : [0, 1]
   return (
-    <svg viewBox="0 0 320 80" width="100%" style={{ touchAction: 'none' }}
+    <svg viewBox="0 0 320 82" width="100%" style={{ touchAction: 'none', cursor: 'pointer' }}
       onPointerDown={(event) => setFrom(event.clientX, event.currentTarget)}
       onPointerMove={(event) => { if (event.buttons) setFrom(event.clientX, event.currentTarget) }}>
       <line x1="20" y1="40" x2="300" y2="40" stroke="currentColor" strokeWidth="3" />
-      <text x="20" y="16" textAnchor="start" fontSize="11">{Number.isInteger(response.min) ? formatNumber(locale, response.min) : String(response.min)}</text>
-      <text x="300" y="16" textAnchor="end" fontSize="11">{Number.isInteger(response.max) ? formatNumber(locale, response.max) : String(response.max)}</text>
+      {ticks.map((i) => {
+        const txPos = stepCount > 0 && stepCount <= 24 ? 20 + (i / stepCount) * 280 : i === 0 ? 20 : 300
+        const major = i === 0 || i === ticks.length - 1
+        return <line key={i} x1={txPos} y1={major ? 30 : 34} x2={txPos} y2={major ? 50 : 46} stroke="currentColor" strokeWidth={major ? 2.5 : 1.5} opacity={major ? 1 : 0.55} />
+      })}
+      <text x="20" y="18" textAnchor="start" fontSize="11" fill="currentColor">{Number.isInteger(response.min) ? formatNumber(locale, response.min) : formatNumber(locale, response.min)}</text>
+      <text x="300" y="18" textAnchor="end" fontSize="11" fill="currentColor">{Number.isInteger(response.max) ? formatNumber(locale, response.max) : formatNumber(locale, response.max)}</text>
       {/* The marker glides to each new place. Before the first tap it is a dashed ring at the start, so the line clearly needs a tap. */}
       <g className="nl-track" style={{ transform: `translateX(${x - 20}px)` }}>
-        <circle cx="20" cy="40" r="12" className={value == null ? 'nl-marker unset' : 'nl-marker'} />
+        <circle cx="20" cy="40" r="11" className={value == null ? 'nl-marker unset' : 'nl-marker'} />
       </g>
-      <text x="160" y="72" textAnchor="middle" fontSize="14">{value == null ? t(locale, 'widget.tapLine') : Number.isInteger(value) ? formatNumber(locale, value) : value}</text>
+      <text x="160" y="74" textAnchor="middle" fontSize="14" fill="currentColor">{value == null ? t(locale, 'widget.tapLine') : formatVal(value)}</text>
     </svg>
   )
 }
@@ -281,7 +326,7 @@ function PlaneWidget({ response, locale, onChange, initial, reveal }: { response
   // The crosshair runs to the axes, or to the nearest edge when the plane does not reach an axis.
   const axisX = map.sx(Math.min(Math.max(0, response.xMin), response.xMax))
   const axisY = map.sy(Math.min(Math.max(0, response.yMin), response.yMax))
-  const pick = (event: ReactPointerEvent<SVGSVGElement>) => {
+  const pick = (event: ReactPointerEvent<SVGSVGElement>, withRipple = true) => {
     const rect = event.currentTarget.getBoundingClientRect()
     const raw = map.fromPixel(((event.clientX - rect.left) / rect.width) * map.w, ((event.clientY - rect.top) / rect.height) * map.h)
     const next = {
@@ -289,13 +334,15 @@ function PlaneWidget({ response, locale, onChange, initial, reveal }: { response
       y: Math.min(response.yMax, Math.max(response.yMin, raw.y)),
     }
     setPoint(next)
-    taps.current += 1
-    setRipple({ x: map.sx(next.x), y: map.sy(next.y), id: taps.current })
+    if (withRipple) {
+      taps.current += 1
+      setRipple({ x: map.sx(next.x), y: map.sy(next.y), id: taps.current })
+    }
     onChange({ kind: 'points', points: [next] })
   }
   return (
     <div>
-      <PlaneGrid xMin={response.xMin} xMax={response.xMax} yMin={response.yMin} yMax={response.yMax} onPointerDown={pick}>
+      <PlaneGrid xMin={response.xMin} xMax={response.xMax} yMin={response.yMin} yMax={response.yMax} onPointerDown={(e) => pick(e, true)} onPointerMove={(e) => { if (e.buttons) pick(e, false) }}>
         {point ? (
           <g>
             <line className="plane-cross" x1={map.sx(point.x)} y1={map.sy(point.y)} x2={map.sx(point.x)} y2={axisY} />
@@ -336,19 +383,23 @@ function ClockWidget({ locale, onChange, initial }: { locale: Locale; onChange: 
   const emit = useEmit(onChange)
   const handRef = useRef(hand)
   handRef.current = hand
+  useEffect(() => {
+    emit.current({ kind: 'clock', ...time })
+  }, [time, emit])
   const apply = (event: ReactPointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
     const dx = event.clientX - (rect.left + rect.width / 2)
     const dy = event.clientY - (rect.top + rect.height / 2)
     let deg = (Math.atan2(dx, -dy) * 180) / Math.PI
     if (deg < 0) deg += 360
-    setTime((current) => {
-      const next = handRef.current === 'm'
-        ? { ...current, m: Math.round(deg / 6) % 60 }
-        : { ...current, h: Math.round(deg / 30) % 12 || 12 }
-      emit.current({ kind: 'clock', ...next })
-      return next
-    })
+    setTime((current) => handRef.current === 'm'
+      ? { ...current, m: Math.round(deg / 6) % 60 }
+      : { ...current, h: Math.round(deg / 30) % 12 || 12 })
+  }
+  const nudge = (delta: number) => {
+    setTime((current) => hand === 'm'
+      ? { ...current, m: (current.m + delta + 60) % 60 }
+      : { ...current, h: ((current.h - 1 + delta + 12) % 12) + 1 })
   }
   return (
     <div style={{ textAlign: 'center' }}>
@@ -356,10 +407,16 @@ function ClockWidget({ locale, onChange, initial }: { locale: Locale; onChange: 
         <button type="button" className="chip" data-on={hand === 'h'} onClick={() => setHand('h')}>{t(locale, 'widget.hours')}</button>
         <button type="button" className="chip" data-on={hand === 'm'} onClick={() => setHand('m')}>{t(locale, 'widget.minutes')}</button>
       </div>
-      <div style={{ touchAction: 'none', display: 'inline-block' }} onPointerDown={apply} onPointerMove={(event) => { if (event.buttons) apply(event) }}>
+      <div style={{ touchAction: 'none', display: 'inline-block', cursor: 'pointer' }} onPointerDown={apply} onPointerMove={(event) => { if (event.buttons) apply(event) }}>
         <ClockFace h={time.h} m={time.m} interactive />
       </div>
       <div className="entry">{time.h}:{String(time.m).padStart(2, '0')}</div>
+      <div className="row" style={{ justifyContent: 'center' }}>
+        {hand === 'm' ? <button type="button" className="chip" onClick={() => nudge(-5)}>−5</button> : null}
+        <button type="button" className="chip" onClick={() => nudge(-1)}>−1</button>
+        <button type="button" className="chip" onClick={() => nudge(1)}>+1</button>
+        {hand === 'm' ? <button type="button" className="chip" onClick={() => nudge(5)}>+5</button> : null}
+      </div>
     </div>
   )
 }
@@ -375,7 +432,7 @@ function ChartWidget({ response, locale, onChange, initial }: { response: Extrac
   useEffect(() => {
     emit.current({ kind: 'chart', values, colors, axisMax: axis, axisAtLeast: 0 })
   }, [values, colors, axis, emit])
-  const height = size === 's' ? 120 : size === 'l' ? 260 : 180
+  const height = size === 's' ? 120 : size === 'l' ? 240 : 170
   const paint = (index: number, clientY: number, element: HTMLElement) => {
     const rect = element.getBoundingClientRect()
     const ratio = Math.min(1, Math.max(0, (rect.bottom - clientY) / rect.height))
@@ -384,13 +441,18 @@ function ChartWidget({ response, locale, onChange, initial }: { response: Extrac
     setValues((current) => current.map((item, i) => (i === index ? Math.min(response.maxValue, value) : item)))
     setActive(index)
   }
+  const linePoints = values.map((v, i) => {
+    const x = values.length <= 1 ? 50 : ((i + 0.5) / values.length) * 100
+    const y = 100 - Math.min(100, axis ? (v / axis) * 100 : 0)
+    return `${x.toFixed(2)},${y.toFixed(2)}`
+  }).join(' ')
   return (
     <div>
       <div className="row">
         <span className="fine">{t(locale, 'widget.axis')}</span>
         {response.axisChoices.map((choice) => <button key={choice} type="button" className="chip" data-on={axis === choice} onClick={() => setAxis(choice)}>{choice}</button>)}
       </div>
-      <div className="row">
+      <div className="row" style={{ marginTop: 6 }}>
         <span className="fine">{t(locale, 'widget.size')}</span>
         {(['s', 'm', 'l'] as const).map((item) => <button key={item} type="button" className="chip" data-on={size === item} onClick={() => setSize(item)}>{t(locale, `size.${item}`)}</button>)}
         <button type="button" className="chip" data-on={style === 'bar'} onClick={() => setStyle('bar')}>{t(locale, 'widget.bars')}</button>
@@ -402,19 +464,24 @@ function ChartWidget({ response, locale, onChange, initial }: { response: Extrac
           <span>{Math.round(axis / 2)}</span>
           <span>0</span>
         </div>
-        <div className={style === 'line' ? 'chart line-mode' : 'chart'} style={{ ['--chart-h' as string]: `${height}px` }}>
-        {values.map((value, index) => (
-          <div className="bar-col" key={index}>
-            <div className="bar-hit" onPointerDown={(event) => paint(index, event.clientY, event.currentTarget)} onPointerMove={(event) => { if (event.buttons) paint(index, event.clientY, event.currentTarget) }}>
-              <div className="bar-fill" style={{ height: `${axis ? (value / axis) * 100 : 0}%`, background: colors[index], opacity: style === 'line' ? 0.35 : 1 }} />
+        <div className={style === 'line' ? 'chart line-mode' : 'chart'} style={{ ['--chart-h' as string]: `${height}px`, position: 'relative' }}>
+          {style === 'line' && values.length > 1 ? (
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" style={{ position: 'absolute', inset: '8px 4px 36px', width: 'calc(100% - 8px)', height: 'calc(100% - 44px)', pointerEvents: 'none', zIndex: 1 }}>
+              <polyline points={linePoints} fill="none" stroke="var(--teal)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+            </svg>
+          ) : null}
+          {values.map((value, index) => (
+            <div className="bar-col" key={index} data-on={active === index} onClick={() => setActive(index)}>
+              <div className="bar-hit" onPointerDown={(event) => paint(index, event.clientY, event.currentTarget)} onPointerMove={(event) => { if (event.buttons) paint(index, event.clientY, event.currentTarget) }}>
+                <div className="bar-fill" style={{ height: `${Math.min(100, axis ? (value / axis) * 100 : 0)}%`, background: colors[index], opacity: style === 'line' ? 0.3 : 1 }} />
+              </div>
+              <b>{value}</b>
+              <small>{tx(locale, response.labels[index])}</small>
             </div>
-            <b>{value}</b>
-            <small>{tx(locale, response.labels[index])}</small>
-          </div>
-        ))}
+          ))}
         </div>
       </div>
-      <div className="row">
+      <div className="row" style={{ marginTop: 8 }}>
         <button type="button" className="icon-btn" aria-label={t(locale, 'widget.lower')} onClick={() => {
           const step = response.step && response.step > 0 ? response.step : 1
           setValues((current) => current.map((item, index) => index === active ? Math.max(0, item - step) : item))
@@ -439,19 +506,36 @@ function AngleWidget({ onChange, initial }: { onChange: (answer: Answer | null) 
     const rect = event.currentTarget.getBoundingClientRect()
     const x = ((event.clientX - rect.left) / rect.width) * 240
     const y = ((event.clientY - rect.top) / rect.height) * 140
-    const rad = Math.atan2(110 - y, x - 30)
+    const rad = Math.atan2(110 - y, x - 120)
     const next = Math.min(180, Math.max(0, Math.round((rad * 180) / Math.PI)))
     setDegrees(next)
-    onChange({ kind: 'angle', degrees: next })
   }
+  const nudge = (delta: number) => setDegrees((d) => Math.min(180, Math.max(0, d + delta)))
   const rad = (degrees * Math.PI) / 180
+  const rx = 120 + Math.cos(rad) * 90
+  const ry = 110 - Math.sin(rad) * 90
+  const arcX = 120 + Math.cos(rad) * 28
+  const arcY = 110 - Math.sin(rad) * 28
   return (
-    <div>
-      <svg viewBox="0 0 240 140" width="100%" style={{ touchAction: 'none' }} onPointerDown={setFrom} onPointerMove={(event) => { if (event.buttons) setFrom(event) }}>
-        <line x1="30" y1="110" x2="210" y2="110" stroke="currentColor" strokeWidth="3" />
-        <line x1="30" y1="110" x2={30 + Math.cos(rad) * 110} y2={110 - Math.sin(rad) * 110} stroke="#e25b45" strokeWidth="4" />
+    <div style={{ textAlign: 'center' }}>
+      <svg viewBox="0 0 240 140" width="100%" style={{ maxWidth: 320, touchAction: 'none', cursor: 'pointer' }} onPointerDown={setFrom} onPointerMove={(event) => { if (event.buttons) setFrom(event) }}>
+        <path d="M30 110 A90 90 0 0 1 210 110" fill="none" stroke="var(--line)" strokeWidth="2" strokeDasharray="4 4" />
+        {[0, 30, 60, 90, 120, 150, 180].map((mark) => {
+          const a = (mark * Math.PI) / 180
+          return <line key={mark} x1={120 + Math.cos(a) * 84} y1={110 - Math.sin(a) * 84} x2={120 + Math.cos(a) * 92} y2={110 - Math.sin(a) * 92} stroke="var(--ink-soft)" strokeWidth="1.5" />
+        })}
+        {degrees > 0 ? <path d={`M148 110 A28 28 0 0 0 ${arcX.toFixed(1)} ${arcY.toFixed(1)}`} fill="none" stroke="#e25b45" strokeWidth="2.5" opacity="0.55" /> : null}
+        <line x1="120" y1="110" x2="210" y2="110" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <line x1="120" y1="110" x2={rx} y2={ry} stroke="#e25b45" strokeWidth="4" strokeLinecap="round" />
+        <circle cx="120" cy="110" r="4.5" fill="currentColor" />
       </svg>
       <div className="entry">{degrees}°</div>
+      <div className="row" style={{ justifyContent: 'center' }}>
+        <button type="button" className="chip" onClick={() => nudge(-5)}>−5°</button>
+        <button type="button" className="chip" onClick={() => nudge(-1)}>−1°</button>
+        <button type="button" className="chip" onClick={() => nudge(1)}>+1°</button>
+        <button type="button" className="chip" onClick={() => nudge(5)}>+5°</button>
+      </div>
     </div>
   )
 }
@@ -498,6 +582,24 @@ function DigitsWidget({ response, locale, onChange, initial }: { response: Extra
     }
   }, [active])
   const push = (key: string) => {
+    if (key === 'clear') {
+      setDigits(response.columns.map(() => 0))
+      setActive(0)
+      return
+    }
+    if (key === 'back') {
+      setDigits((current) => current.map((digit, index) => index === active ? 0 : digit))
+      setActive((index) => Math.max(0, index - 1))
+      return
+    }
+    if (key === 'ArrowLeft') {
+      setActive((index) => Math.max(0, index - 1))
+      return
+    }
+    if (key === 'ArrowRight') {
+      setActive((index) => Math.min(response.columns.length - 1, index + 1))
+      return
+    }
     if (!/^\d$/.test(key)) return
     setDigits((current) => current.map((digit, index) => index === active ? Number(key) : digit))
     setActive((index) => Math.min(response.columns.length - 1, index + 1))
@@ -525,25 +627,23 @@ function MultiWidget({ response, locale, onChange, initial }: { response: Extrac
   })
   const [active, setActive] = useState(response.fields[0]?.id ?? '')
   const field = response.fields.find((item) => item.id === active) ?? response.fields[0]
+  const emit = useEmit(onChange)
+  useEffect(() => {
+    const parts: Record<string, number> = {}
+    let ready = true
+    for (const item of response.fields) {
+      const value = parseNumeric(texts[item.id] ?? '')
+      if (value == null) ready = false
+      else parts[item.id] = value
+    }
+    emit.current(ready ? { kind: 'multi', parts } : null)
+  }, [texts, response.fields, emit])
   const push = (key: string) => {
+    if (!field) return
     setTexts((current) => {
       const prev = current[active] ?? ''
-      let next = prev
-      if (key === 'back') next = prev.slice(0, -1)
-      else if (key === 'clear') next = ''
-      else if (key === 'sign') next = prev.startsWith('-') ? prev.slice(1) : `-${prev}`
-      else if (key === 'dec') next = prev.includes('.') ? prev : `${prev || '0'}.`
-      else if (/^\d$/.test(key)) next = prev.replace('-', '').replace('.', '').length >= 16 ? prev : `${prev}${key}`
-      const merged = { ...current, [active]: next }
-      const parts: Record<string, number> = {}
-      let ready = true
-      for (const item of response.fields) {
-        const value = parseNumeric(merged[item.id] ?? '')
-        if (value == null) ready = false
-        else parts[item.id] = value
-      }
-      onChange(ready ? { kind: 'multi', parts } : null)
-      return merged
+      const next = applyNumber(prev, key, field.allowDecimal, field.allowNegative)
+      return next === prev ? current : { ...current, [active]: next }
     })
   }
   useKeys(push, true)

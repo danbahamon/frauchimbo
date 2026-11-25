@@ -320,6 +320,11 @@ const STR: Record<string, Localized> = {
   'sum.correct': { en: 'Correct', de: 'Richtig', es: 'Correcta' },
   'stats.print': { en: 'Print for a teacher', de: 'Für eine Lehrkraft drucken', es: 'Imprimir para un docente' },
   'stats.report': { en: 'Studio report', de: 'Atelierbericht', es: 'Informe del estudio' },
+  'stats.tab.overview': { en: 'Overview', de: 'Übersicht', es: 'Resumen' },
+  'stats.tab.skills': { en: 'Skills & mistakes', de: 'Fertigkeiten & Fehler', es: 'Destrezas y errores' },
+  'stats.tab.history': { en: 'History', de: 'Verlauf', es: 'Historial' },
+  'work.tab.activity': { en: 'Activity', de: 'Aktivität', es: 'Actividad' },
+  'work.tab.trend': { en: 'Last 10 trend', de: 'Verlauf (letzte 10)', es: 'Tendencia (últimas 10)' },
   'stats.accuracy': { en: 'Recent accuracy', de: 'Jüngste Trefferquote', es: 'Precisión reciente' },
   'stats.attempts': { en: '{n} attempts', de: '{n} Versuche', es: '{n} intentos' },
   'stats.empty': {

@@ -149,16 +149,27 @@ export function StimulusView({ stimulus, locale }: { stimulus?: Stimulus; locale
   if (stimulus.type === 'angle' || stimulus.type === 'protractor') {
     const deg = stimulus.degrees
     const rad = (deg * Math.PI) / 180
+    const rx = 120 + Math.cos(rad) * 90
+    const ry = 110 - Math.sin(rad) * 90
+    const arcX = 120 + Math.cos(rad) * 26
+    const arcY = 110 - Math.sin(rad) * 26
     return (
       <div className="figure" style={{ textAlign: 'center' }}>
         <svg viewBox="0 0 240 140" width="240">
           {stimulus.type === 'protractor' ? <path d="M30 110 A90 90 0 0 1 210 110" fill="none" stroke="#cbbba8" strokeWidth="18" /> : null}
-          <line x1="30" y1="110" x2="210" y2="110" stroke="#1c1712" strokeWidth="3" />
-          <line x1="30" y1="110" x2={30 + Math.cos(rad) * 120} y2={110 - Math.sin(rad) * 120} stroke="#e25b45" strokeWidth="3" />
+          {deg > 0 ? <path d={`M146 110 A26 26 0 0 0 ${arcX.toFixed(1)} ${arcY.toFixed(1)}`} fill="none" stroke="#e25b45" strokeWidth="2.5" opacity="0.55" /> : null}
+          <line x1="120" y1="110" x2="210" y2="110" stroke="#1c1712" strokeWidth="3" strokeLinecap="round" />
+          <line x1="120" y1="110" x2={rx} y2={ry} stroke="#e25b45" strokeWidth="3" strokeLinecap="round" />
+          <circle cx="120" cy="110" r="4" fill="#1c1712" />
           {stimulus.type === 'protractor'
             ? [0, 30, 60, 90, 120, 150, 180].map((mark) => {
                 const a = (mark * Math.PI) / 180
-                return <text key={mark} x={30 + Math.cos(a) * 78} y={110 - Math.sin(a) * 78} fontSize="10">{mark}</text>
+                return (
+                  <g key={mark}>
+                    <line x1={120 + Math.cos(a) * 81} y1={110 - Math.sin(a) * 81} x2={120 + Math.cos(a) * 99} y2={110 - Math.sin(a) * 99} stroke="#5c5348" strokeWidth="1.2" />
+                    <text x={120 + Math.cos(a) * 68} y={110 - Math.sin(a) * 68 + 3} textAnchor="middle" fontSize="9.5" fill="#1c1712">{mark}</text>
+                  </g>
+                )
               })
             : null}
         </svg>
@@ -268,7 +279,7 @@ export function planeMap(xMin: number, xMax: number, yMin: number, yMax: number)
 }
 
 // Empty coordinate plane: grid, axes, and labels. It never draws a target point.
-export function PlaneGrid({ xMin, xMax, yMin, yMax, className = 'plane', onPointerDown, children }: { xMin: number; xMax: number; yMin: number; yMax: number; className?: string; onPointerDown?: (event: ReactPointerEvent<SVGSVGElement>) => void; children?: ReactNode }) {
+export function PlaneGrid({ xMin, xMax, yMin, yMax, className = 'plane', onPointerDown, onPointerMove, children }: { xMin: number; xMax: number; yMin: number; yMax: number; className?: string; onPointerDown?: (event: ReactPointerEvent<SVGSVGElement>) => void; onPointerMove?: (event: ReactPointerEvent<SVGSVGElement>) => void; children?: ReactNode }) {
   const { w, h, sx, sy } = planeMap(xMin, xMax, yMin, yMax)
   const lines: ReactNode[] = []
   for (let x = xMin; x <= xMax; x++) lines.push(<line key={`x${x}`} x1={sx(x)} y1={16} x2={sx(x)} y2={h - 16} stroke="#eadfce" />)
@@ -281,8 +292,9 @@ export function PlaneGrid({ xMin, xMax, yMin, yMax, className = 'plane', onPoint
     if (y === 0) continue
     labels.push(<text key={`ly${y}`} x={Math.max(10, sx(0) - 8)} y={sy(y) + 4} textAnchor="end" fontSize="11" fill="currentColor">{y}</text>)
   }
+  const interactive = Boolean(onPointerDown)
   return (
-    <svg className={className} viewBox={`0 0 ${w} ${h}`} onPointerDown={onPointerDown}>
+    <svg className={className} viewBox={`0 0 ${w} ${h}`} style={interactive ? { touchAction: 'none', cursor: 'crosshair' } : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove}>
       {lines}
       <line x1={sx(0)} y1="12" x2={sx(0)} y2={h - 12} stroke="currentColor" strokeWidth="2" />
       <line x1="12" y1={sy(0)} x2={w - 12} y2={sy(0)} stroke="currentColor" strokeWidth="2" />
@@ -344,7 +356,12 @@ export function AnswerFace({ question, answer, locale, blank }: { question: Ques
   }
   if (answer.kind === 'choice' && question.response.type === 'choice') {
     const option = question.response.options.find((item) => item.id === answer.id)
-    return <div className="entry" style={{ fontSize: '1.1rem' }}>{option ? <MathText text={tx(locale, option.label)} /> : answer.id}</div>
+    return (
+      <div className="entry" style={{ fontSize: '1.1rem', gap: 6, padding: 8 }}>
+        {option?.shape ? <ShapeFig shape={option.shape} parts={option.parts} shaded={option.shaded} uneven={option.uneven} /> : null}
+        {option ? <MathText text={tx(locale, option.label)} /> : answer.id}
+      </div>
+    )
   }
   if (answer.kind === 'compare') return <div className="entry">{answer.sign}</div>
   if (answer.kind === 'order' && question.response.type === 'order') {

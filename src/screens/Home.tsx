@@ -25,41 +25,24 @@ export function Home() {
   return (
     <div>
       <section className="hero-card">
-        <div className="hero-mascot"><Mascot mood={streak ? 'joy' : 'idle'} size={76} /></div>
+        <div className="hero-mascot"><Mascot mood={streak ? 'joy' : 'idle'} size={56} /></div>
         <div className="hero-copy">
           <p className="kicker">{t(locale, 'home.standards')}</p>
           <h1>{t(locale, greetKey())}, {profile.name}.</h1>
           <p className="muted">{streak === 1 ? t(locale, 'home.streak.one') : streak ? t(locale, 'home.streak', { n: streak }) : t(locale, 'home.streak.zero')}</p>
         </div>
       </section>
-      <div className="hero-actions" style={{ marginTop: 16 }}>
-        <button type="button" className="action" onClick={() => setRoute({ name: 'practice' })}>
-          <Icon name="practice" size={28} />
-          <span><b>{t(locale, 'home.practice')}</b><span>{t(locale, 'home.practice.sub')}</span></span>
-        </button>
-        <button type="button" className="action" onClick={() => setRoute({ name: 'workout' })}>
-          <Icon name="pin" size={28} />
-          <span><b>{t(locale, 'home.workout')}</b><span>{t(locale, 'home.workout.sub')}</span></span>
-        </button>
-        <button type="button" className="action" onClick={() => setRoute({ name: 'test' })}>
-          <Icon name="test" size={28} />
-          <span><b>{t(locale, 'home.test')}</b><span>{t(locale, 'home.test.sub')}</span></span>
-        </button>
-        <button type="button" className="action" onClick={() => setRoute({ name: 'stats' })}>
-          <Icon name="stats" size={28} />
-          <span><b>{t(locale, 'home.stats')}</b><span>{t(locale, 'home.stats.sub')}</span></span>
-        </button>
-      </div>
       {data.active ? (
-        <button type="button" className="text-btn" style={{ marginTop: 14, width: '100%' }} onClick={() => setRoute({ name: 'run' })}>
+        <button type="button" className="text-btn" style={{ marginTop: 12, width: '100%' }} onClick={() => setRoute({ name: 'run' })}>
+          <Icon name="forward" size={18} />
           {t(locale, 'home.resume')} · {data.active.blueprint.title ? tx(locale, data.active.blueprint.title) : t(locale, 'test.q', { n: data.active.index + 1 })}
         </button>
       ) : null}
       {skill && lead ? (
         <button
           type="button"
-          className="skill"
-          style={{ marginTop: 16 }}
+          className="skill home-lead"
+          style={{ marginTop: 12 }}
           onClick={() => setRoute({ name: 'play', skillId: skill.id, auto: true, difficulty: lead.difficulty })}
         >
           <i className="domain" style={{ background: DOMAIN_COLOR[skill.domain] }} />
@@ -68,8 +51,27 @@ export function Home() {
             <b>{tx(locale, skill.title)}</b>
             <small>{t(locale, `reason.${lead.reason}`)} · {t(locale, levelKey(lead.difficulty))}</small>
           </span>
+          <Icon name="forward" size={18} />
         </button>
       ) : null}
+      <div className="hero-actions" style={{ marginTop: 12 }}>
+        <button type="button" className="action" onClick={() => setRoute({ name: 'practice' })}>
+          <Icon name="practice" size={22} />
+          <span><b>{t(locale, 'home.practice')}</b><span>{t(locale, 'home.practice.sub')}</span></span>
+        </button>
+        <button type="button" className="action" onClick={() => setRoute({ name: 'workout' })}>
+          <Icon name="pin" size={22} />
+          <span><b>{t(locale, 'home.workout')}</b><span>{t(locale, 'home.workout.sub')}</span></span>
+        </button>
+        <button type="button" className="action" onClick={() => setRoute({ name: 'test' })}>
+          <Icon name="test" size={22} />
+          <span><b>{t(locale, 'home.test')}</b><span>{t(locale, 'home.test.sub')}</span></span>
+        </button>
+        <button type="button" className="action" onClick={() => setRoute({ name: 'stats' })}>
+          <Icon name="stats" size={22} />
+          <span><b>{t(locale, 'home.stats')}</b><span>{t(locale, 'home.stats.sub')}</span></span>
+        </button>
+      </div>
     </div>
   )
 }

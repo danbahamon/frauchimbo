@@ -33,7 +33,7 @@ export function Onboarding() {
 
   return (
     <div className="rise">
-      <Mascot mood={step === 3 ? 'joy' : 'idle'} size={140} />
+      <Mascot mood={step === 3 ? 'joy' : 'idle'} size={84} />
       <p className="kicker">Frau Chimbo</p>
       {step === 0 ? (
         <>
